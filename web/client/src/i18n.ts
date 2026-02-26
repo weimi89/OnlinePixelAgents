@@ -83,4 +83,9 @@ export const t = {
   activeSession: '進行中',
   loadingSessions: '載入中...',
   sessionProject: '專案',
+  searchSessions: '搜尋工作階段...',
+  noMatchingSessions: '沒有符合的工作階段',
+
+  // 連線狀態
+  disconnected: '已斷線，重連中...',
 } as const

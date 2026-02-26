@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { t } from '../i18n.js'
 
 export interface SessionInfo {
@@ -42,6 +42,35 @@ function formatSize(bytes: number): string {
 
 export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }: SessionPickerProps) {
   const [hovered, setHovered] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // 開關時重設搜尋
+  useEffect(() => {
+    if (!isOpen) setSearchQuery('')
+  }, [isOpen])
+
+  // Escape 鍵關閉
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
+
+  const filteredSessions = useMemo(() => {
+    if (!searchQuery.trim()) return sessions
+    const q = searchQuery.toLowerCase()
+    return sessions.filter((s) =>
+      s.projectName.toLowerCase().includes(q) ||
+      s.title.toLowerCase().includes(q) ||
+      s.projectDir.toLowerCase().includes(q),
+    )
+  }, [sessions, searchQuery])
 
   if (!isOpen) return null
 
@@ -73,7 +102,7 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
           borderRadius: 0,
           padding: '4px',
           boxShadow: 'var(--pixel-shadow)',
-          width: 480,
+          width: 'min(480px, 90vw)',
           maxHeight: '70vh',
           display: 'flex',
           flexDirection: 'column',
@@ -113,6 +142,30 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
           </button>
         </div>
 
+        {/* 搜尋框 */}
+        {!isLoading && sessions.length > 0 && (
+          <div style={{ padding: '4px 8px', flexShrink: 0 }}>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t.searchSessions}
+              autoFocus
+              style={{
+                width: '100%',
+                padding: '4px 8px',
+                fontSize: '20px',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '2px solid var(--pixel-border)',
+                borderRadius: 0,
+                color: 'var(--pixel-text)',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+        )}
+
         {/* 工作階段列表 */}
         <div
           style={{
@@ -129,8 +182,12 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
             <div style={{ padding: '20px', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '20px' }}>
               {t.noSessions}
             </div>
+          ) : filteredSessions.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '20px' }}>
+              {t.noMatchingSessions}
+            </div>
           ) : (
-            sessions.map((session) => {
+            filteredSessions.map((session) => {
               const key = session.sessionId
               const isHovered = hovered === key
               return (

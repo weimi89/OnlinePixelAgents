@@ -317,6 +317,10 @@ export function useExtensionMessages(
         })
         os.removeSubagent(id, parentToolId)
         setSubagentCharacters((prev) => prev.filter((s) => !(s.parentAgentId === id && s.parentToolId === parentToolId)))
+      } else if (msg.type === 'agentDetached') {
+        const id = msg.id as number
+        const detached = msg.detached as boolean
+        os.setAgentDetached(id, detached)
       } else if (msg.type === 'agentModel') {
         const id = msg.id as number
         const model = msg.model as string

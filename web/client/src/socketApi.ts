@@ -20,3 +20,23 @@ export function onServerMessage(handler: (data: unknown) => void): () => void {
   socket.on('message', handler)
   return () => { socket.off('message', handler) }
 }
+
+/**
+ * 監聽 Socket.IO 連線狀態變更。
+ * @returns 取消訂閱函式。
+ */
+export function onConnectionChange(handler: (connected: boolean) => void): () => void {
+  const onConnect = () => handler(true)
+  const onDisconnect = () => handler(false)
+  socket.on('connect', onConnect)
+  socket.on('disconnect', onDisconnect)
+  return () => {
+    socket.off('connect', onConnect)
+    socket.off('disconnect', onDisconnect)
+  }
+}
+
+/** 取得目前的連線狀態 */
+export function isConnected(): boolean {
+  return socket.connected
+}

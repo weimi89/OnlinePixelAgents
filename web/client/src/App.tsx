@@ -6,7 +6,7 @@ import { EditorToolbar } from './office/editor/EditorToolbar.js'
 import { EditorState } from './office/editor/editorState.js'
 import { EditTool } from './office/types.js'
 import { isRotatable } from './office/layout/furnitureCatalog.js'
-import { vscode, onServerMessage } from './socketApi.js'
+import { vscode, onServerMessage, onConnectionChange, isConnected } from './socketApi.js'
 import { useExtensionMessages } from './hooks/useExtensionMessages.js'
 import { PULSE_ANIMATION_DURATION_SEC } from './constants.js'
 import { useEditorActions } from './hooks/useEditorActions.js'
@@ -131,6 +131,11 @@ function App() {
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false)
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [isLoadingSessions, setIsLoadingSessions] = useState(false)
+  const [connected, setConnected] = useState(isConnected)
+
+  useEffect(() => {
+    return onConnectionChange(setConnected)
+  }, [])
 
   const handleToggleDebugMode = useCallback(() => setIsDebugMode((prev) => !prev), [])
 
@@ -240,6 +245,39 @@ function App() {
       />
 
       <ZoomControls zoom={editor.zoom} onZoomChange={editor.handleZoomChange} />
+
+      {/* 斷線指示器 */}
+      {!connected && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 80,
+            zIndex: 'var(--pixel-controls-z)',
+            background: 'var(--pixel-bg)',
+            border: '2px solid var(--pixel-status-permission)',
+            borderRadius: 0,
+            padding: '4px 10px',
+            boxShadow: 'var(--pixel-shadow)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: 'var(--pixel-status-permission)',
+              flexShrink: 0,
+            }}
+          />
+          <span style={{ fontSize: '20px', color: 'var(--pixel-status-permission)' }}>
+            {t.disconnected}
+          </span>
+        </div>
+      )}
 
       {/* 暈影覆蓋層 */}
       <div

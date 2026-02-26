@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react'
-import { vscode } from '../socketApi.js'
+import { useState, useRef, useEffect } from 'react'
+import { vscode, onServerMessage } from '../socketApi.js'
 import { isSoundEnabled, setSoundEnabled } from '../notificationSound.js'
 import { t } from '../i18n.js'
 
@@ -30,17 +30,41 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
   const [soundLocal, setSoundLocal] = useState(isSoundEnabled)
   const importInputRef = useRef<HTMLInputElement>(null)
 
+  // Escape 鍵關閉
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
+
+  // 監聽伺服器回傳的佈局資料，觸發瀏覽器下載
+  useEffect(() => {
+    const unsub = onServerMessage((data) => {
+      const msg = data as Record<string, unknown>
+      if (msg.type === 'exportLayoutData' && msg.layout) {
+        const json = JSON.stringify(msg.layout, null, 2)
+        const blob = new Blob([json], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'pixel-agents-layout.json'
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+    })
+    return unsub
+  }, [])
+
   if (!isOpen) return null
 
   const handleExport = () => {
-    // 在 Web 版中，從本地狀態請求當前佈局並下載為檔案
-    // 目前透過迂迴方式從伺服器取得：儲存觸發器已就位
-    // 因此我們從 OfficeState（已在記憶體中）讀取佈局 - 但此處無法存取。
-    // 改為透過伺服器儲存路徑觸發當前佈局的下載：
-    vscode.postMessage({ type: 'saveLayout', layout: null }) // 確保已儲存
-    // 無法從瀏覽器下載 ~/.pixel-agents/layout.json，
-    // 因此 Web 版暫時跳過匯出（佈局已自動儲存）
-    onClose()
+    vscode.postMessage({ type: 'requestExportLayout' })
   }
 
   const handleImport = () => {

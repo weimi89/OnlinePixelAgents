@@ -330,7 +330,11 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 			);
 			break;
 		}
-		// exportLayout / importLayout 在 Web 版本中由客戶端處理
+		case 'requestExportLayout': {
+			const layout = loadLayout(defaultLayout);
+			sender.postMessage({ type: 'exportLayoutData', layout });
+			break;
+		}
 	}
 }
 

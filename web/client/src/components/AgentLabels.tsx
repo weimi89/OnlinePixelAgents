@@ -74,7 +74,10 @@ export function AgentLabels({
         if (!ch) return null
 
         // Character position: device pixels → CSS pixels (follow sitting offset)
-        const sittingOffset = ch.state === CharacterState.TYPE ? 6 : 0
+        const sittingOffset = ch.state === CharacterState.TYPE ? 14 : 0
+        // Hide label when a speech bubble is showing (let the bubble be visible alone)
+        if (ch.bubbleType) return null
+
         const screenX = (deviceOffsetX + ch.x * zoom) / dpr
         const screenY = (deviceOffsetY + (ch.y + sittingOffset - 46) * zoom) / dpr
 

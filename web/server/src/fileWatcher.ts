@@ -174,6 +174,7 @@ function scanAndAdopt(
 			isWaiting: false,
 			permissionSent: false,
 			hadToolsInTurn: false,
+			model: null,
 		};
 		agents.set(id, agent);
 		persistAgents();

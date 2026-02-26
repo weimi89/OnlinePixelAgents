@@ -19,6 +19,7 @@ export interface AgentState {
 	isWaiting: boolean;
 	permissionSent: boolean;
 	hadToolsInTurn: boolean;
+	model: string | null;
 }
 
 export interface PersistedAgent {

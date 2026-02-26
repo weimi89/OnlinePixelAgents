@@ -4,10 +4,21 @@ import type { SubagentCharacter } from '../hooks/useExtensionMessages.js'
 import { TILE_SIZE, CharacterState } from '../office/types.js'
 import { t } from '../i18n.js'
 
+/** Format raw model ID to short display name, e.g. "claude-opus-4-6" → "Opus 4.6" */
+function formatModelName(model: string): string {
+  const m = model.match(/^claude-(\w+)-(\d+)-(\d+)/)
+  if (m) {
+    const family = m[1].charAt(0).toUpperCase() + m[1].slice(1)
+    return `${family} ${m[2]}.${m[3]}`
+  }
+  return model.replace(/^claude-/, '')
+}
+
 interface AgentLabelsProps {
   officeState: OfficeState
   agents: number[]
   agentStatuses: Record<number, string>
+  agentModels: Record<number, string>
   containerRef: React.RefObject<HTMLDivElement | null>
   zoom: number
   panRef: React.RefObject<{ x: number; y: number }>
@@ -18,6 +29,7 @@ export function AgentLabels({
   officeState,
   agents,
   agentStatuses,
+  agentModels,
   containerRef,
   zoom,
   panRef,
@@ -79,7 +91,8 @@ export function AgentLabels({
           dotColor = '#3794ff'
         }
 
-        const labelText = subLabelMap.get(id) || t.agent(id)
+        const modelDisplay = agentModels[id] ? formatModelName(agentModels[id]) : null
+        const labelText = subLabelMap.get(id) || (modelDisplay ? `${modelDisplay}` : t.agent(id))
 
         return (
           <div

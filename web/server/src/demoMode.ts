@@ -171,6 +171,9 @@ export function startDemoMode(sender: MessageSender, agentCount: number = 3): vo
 			};
 			demoAgents.push(agent);
 			sender.postMessage({ type: 'agentCreated', id });
+			// Simulate model assignment — alternate between models
+			const demoModels = ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5-20251001'];
+			sender.postMessage({ type: 'agentModel', id, model: demoModels[(id - 1) % demoModels.length] });
 			console.log(`[Pixel Agents] Demo agent ${id} created`);
 
 			// Start activity after a short delay

@@ -101,6 +101,7 @@ function spawnClaudeAgent(
 		isWaiting: false,
 		permissionSent: false,
 		hadToolsInTurn: false,
+		model: null,
 	};
 
 	agents.set(id, agent);
@@ -260,6 +261,13 @@ export function sendExistingAgents(
 
 	// Re-send current states
 	for (const [agentId, agent] of agents) {
+		if (agent.model) {
+			sender.postMessage({
+				type: 'agentModel',
+				id: agentId,
+				model: agent.model,
+			});
+		}
 		for (const [toolId, status] of agent.activeToolStatuses) {
 			sender.postMessage({
 				type: 'agentToolStart',

@@ -1,94 +1,127 @@
-# Contributing to Pixel Agents
+# 貢獻指南 — OnlinePixelAgents
 
-Thanks for your interest in contributing to Pixel Agents! All contributions are welcome — features, bug fixes, documentation improvements, refactors, and more.
+感謝你有興趣為 OnlinePixelAgents 做出貢獻！歡迎各種類型的貢獻 — 新功能、錯誤修復、文件改進、重構等。
 
-This project is licensed under the [MIT License](LICENSE), so your contributions will be too. No CLA or DCO is required.
+本專案以 [MIT License](LICENSE) 授權，你的貢獻也將適用相同授權。無需 CLA 或 DCO。
 
-## Getting Started
+## 開始之前
 
-### Prerequisites
+### 前置需求
 
-- [Node.js](https://nodejs.org/) (LTS recommended)
-- [VS Code](https://code.visualstudio.com/) (v1.109.0 or later)
+- [Node.js](https://nodejs.org/) 18+（LTS 推薦）
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)（用於實際代理測試）
 
-### Setup
+### 安裝（Web 版本）
 
 ```bash
-git clone https://github.com/pablodelucca/pixel-agents.git
-cd pixel-agents
+git clone https://github.com/RD-CAT/OnlinePixelAgents.git
+cd OnlinePixelAgents/web
+npm install
+npm run build
+npm start
+```
+
+瀏覽器開啟 `http://localhost:3000`。
+
+### 安裝（VS Code 擴充 — 原始版本參考）
+
+```bash
+cd OnlinePixelAgents
 npm install
 cd webview-ui && npm install && cd ..
 npm run build
 ```
 
-Then press **F5** in VS Code to launch the Extension Development Host.
+在 VS Code 中按 **F5** 啟動 Extension Development Host。
 
-## Development Workflow
+## 開發流程
 
-For development with live rebuilds, run:
+### Web 版本
+
+```bash
+cd web
+npm run dev
+```
+
+同時啟動 Vite 開發伺服器（客戶端熱重載 :5173）和 tsx watch（伺服器熱重載 :3000）。
+
+演示模式（無需 Claude Code）：
+
+```bash
+cd web/server
+node dist/index.js --demo
+```
+
+### VS Code 擴充
 
 ```bash
 npm run watch
 ```
 
-This starts parallel watchers for both the extension backend (esbuild) and TypeScript type-checking.
+啟動 esbuild 和 TypeScript type-checking 的平行監視器。Webview 變更後需執行 `npm run build:webview`。
 
-> **Note:** The webview (Vite) is not included in `watch` — after changing webview code, run `npm run build:webview` or the full `npm run build`.
+### 專案結構
 
-### Project Structure
-
-| Directory | Description |
+| 目錄 | 說明 |
 |---|---|
-| `src/` | Extension backend — Node.js, VS Code API |
-| `webview-ui/` | React + TypeScript frontend (separate Vite project) |
-| `scripts/` | Asset extraction and generation tooling |
-| `assets/` | Bundled sprites, catalog, and default layout |
+| `web/server/` | Web 版後端 — Express + Socket.IO |
+| `web/client/` | Web 版前端 — React + Vite |
+| `src/` | 原始 VS Code 擴充後端（參考用） |
+| `webview-ui/` | 原始 VS Code webview 前端（參考用） |
+| `scripts/` | 素材擷取和生成工具 |
 
-## Code Guidelines
-### Constants
+## 程式碼規範
 
-**No unused locals or parameters** (`noUnusedLocals` and `noUnusedParameters` are enabled): All magic numbers and strings are centralized — don't add inline constants to source files:
+### 常數管理
 
-- **Extension backend:** `src/constants.ts`
-- **Webview:** `webview-ui/src/constants.ts`
-- **CSS variables:** `webview-ui/src/index.css` `:root` block (`--pixel-*` properties)
+所有魔術數字和字串集中管理 — 不要在原始碼中內嵌常數：
 
-### UI Styling
+- **Web 伺服器：** `web/server/src/constants.ts`
+- **Web 客戶端：** `web/client/src/constants.ts`
+- **CSS 變數：** `web/client/src/index.css` `:root` 區塊（`--pixel-*` 屬性）
+- **i18n 字串：** `web/client/src/i18n.ts`
 
-The project uses a pixel art aesthetic. All overlays should use:
+### TypeScript 限制
 
-- Sharp corners (`border-radius: 0`)
-- Solid backgrounds and `2px solid` borders
-- Hard offset shadows (`2px 2px 0px`, no blur)
-- The FS Pixel Sans font (loaded in `index.css`)
+- 禁用 `enum`（`erasableSyntaxOnly`）— 使用 `as const` 物件
+- 型別匯入需使用 `import type`（`verbatimModuleSyntax`）
+- `noUnusedLocals` / `noUnusedParameters` 已啟用
 
-## Submitting a Pull Request
+### UI 風格
 
-1. Fork the repo and create a feature branch from `main`
-2. Make your changes
-3. Run the full build to verify everything passes:
+專案採用像素藝術美學，所有覆蓋層應使用：
+
+- 銳角（`border-radius: 0`）
+- 實心背景和 `2px solid` 邊框
+- 硬偏移陰影（`2px 2px 0px`，無模糊）
+- FS Pixel Sans 字型（在 `index.css` 中載入）
+
+## 提交 Pull Request
+
+1. Fork 倉庫並從 `main` 建立功能分支
+2. 進行修改
+3. 執行完整建置以驗證：
    ```bash
-   npm run build
+   cd web && npm run build
    ```
-   This runs type-checking, linting, esbuild (extension), and Vite (webview).
-4. Open a pull request against `main` with:
-   - A clear description of what changed and why
-   - How you tested the changes (steps to reproduce / verify)
-   - **Screenshots or GIFs for any UI changes**
+4. 向 `main` 開啟 Pull Request，包含：
+   - 清楚描述變更內容和原因
+   - 測試方式（重現/驗證步驟）
+   - **UI 變更請附截圖或 GIF**
 
-## Reporting Bugs
+## 回報錯誤
 
-[Open an issue](https://github.com/pablodelucca/pixel-agents/issues) with:
+[開啟 Issue](https://github.com/RD-CAT/OnlinePixelAgents/issues)，包含：
 
-- What you expected to happen
-- What actually happened
-- Steps to reproduce
-- VS Code version and OS
+- 預期行為
+- 實際行為
+- 重現步驟
+- Node.js 版本和作業系統
 
-## Feature Requests
+## 功能建議
 
-Have an idea? [Open an issue](https://github.com/pablodelucca/pixel-agents/issues) to discuss it before building. This helps avoid duplicate work and ensures the feature fits the project's direction.
+有想法？[開啟 Issue](https://github.com/RD-CAT/OnlinePixelAgents/issues) 先討論，避免重複工作並確保功能符合專案方向。
 
-## Code of Conduct
+## 行為準則
 
-This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+本專案遵循[貢獻者公約行為準則](CODE_OF_CONDUCT.md)。參與即表示你同意遵守此規範。

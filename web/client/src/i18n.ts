@@ -65,6 +65,9 @@ export const t = {
   // Hints
   pressRToRotate: '按 <b>R</b> 旋轉',
 
+  // Model
+  unknownModel: '未知模型',
+
   // Session Picker
   sessions: '工作階段',
   browseSessions: '瀏覽過去的工作階段',

@@ -1,91 +1,83 @@
-# Contributor Covenant 3.0 Code of Conduct
+# 貢獻者公約 3.0 行為準則
 
-## Our Pledge
+## 我們的承諾
 
-We pledge to make our community welcoming, safe, and equitable for all.
+我們承諾讓社群對所有人而言都是友善、安全且公平的。
 
-We are committed to fostering an environment that respects and promotes the dignity, rights, and contributions of all individuals, regardless of characteristics including race, ethnicity, caste, color, age, physical characteristics, neurodiversity, disability, sex or gender, gender identity or expression, sexual orientation, language, philosophy or religion, national or social origin, socio-economic position, level of education, or other status. The same privileges of participation are extended to everyone who participates in good faith and in accordance with this Covenant.
+我們致力於營造一個尊重並促進所有個人尊嚴、權利和貢獻的環境，不論其種族、族裔、膚色、年齡、身體特徵、神經多樣性、身心障礙、性別、性別認同或表達、性取向、語言、哲學或宗教、國籍或社會出身、社經地位、教育程度或其他身分。所有善意參與並遵守本公約的人都享有同等的參與權利。
 
+## 鼓勵的行為
 
-## Encouraged Behaviors
+我們承認社會規範的差異，並共同努力達到社群對正面行為的期望。我們也理解，基於文化、背景或母語的不同，我們的言行可能會被以非預期的方式解讀。
 
-While acknowledging differences in social norms, we all strive to meet our community's expectations for positive behavior. We also understand that our words and actions may be interpreted differently than we intend based on culture, background, or native language.
+考量這些因素，我們同意相互尊重地對待彼此，並以體現我們共同價值觀的方式行事，包括：
 
-With these considerations in mind, we agree to behave mindfully toward each other and act in ways that center our shared values, including:
+1. 尊重**社群的宗旨**、我們的活動和聚會方式。
+2. 以**友善和誠實**的態度與他人互動。
+3. 尊重**不同的觀點**和經驗。
+4. 對自己的行為和貢獻**負責**。
+5. 優雅地給予和接受**建設性的回饋**。
+6. 承諾在傷害發生時**修復傷害**。
+7. 以其他方式促進和維護**社群的福祉**。
 
-1. Respecting the **purpose of our community**, our activities, and our ways of gathering.
-2. Engaging **kindly and honestly** with others.
-3. Respecting **different viewpoints** and experiences.
-4. **Taking responsibility** for our actions and contributions.
-5. Gracefully giving and accepting **constructive feedback**.
-6. Committing to **repairing harm** when it occurs.
-7. Behaving in other ways that promote and sustain the **well-being of our community**.
+## 禁止的行為
 
+我們同意在社群中限制以下行為。這些行為的實例、威脅和宣傳均違反本行為準則。
 
-## Restricted Behaviors
+1. **騷擾。** 違反明確表達的界線，或在被明確要求停止後仍進行不必要的個人關注。
+2. **人身攻擊。** 對社群成員或群體發表侮辱性、貶低性或輕蔑性的評論。
+3. **刻板印象或歧視。** 基於不可變的身分或特徵來評斷任何人的個性或行為。
+4. **性化行為。** 以在社群背景或目的中通常被認為不當親密的方式行事。
+5. **侵犯隱私。** 未經許可分享或利用他人的個人或私人資訊。
+6. **危害行為。** 對任何人或群體造成、鼓勵或威脅暴力或其他傷害。
+7. 以其他方式**威脅社群福祉**的行為。
 
-We agree to restrict the following behaviors in our community. Instances, threats, and promotion of these behaviors are violations of this Code of Conduct.
+### 其他限制
 
-1. **Harassment.** Violating explicitly expressed boundaries or engaging in unnecessary personal attention after any clear request to stop.
-2. **Character attacks.** Making insulting, demeaning, or pejorative comments directed at a community member or group of people.
-3. **Stereotyping or discrimination.** Characterizing anyone’s personality or behavior on the basis of immutable identities or traits.
-4. **Sexualization.** Behaving in a way that would generally be considered inappropriately intimate in the context or purpose of the community.
-5. **Violating confidentiality**. Sharing or acting on someone's personal or private information without their permission.
-6. **Endangerment.** Causing, encouraging, or threatening violence or other harm toward any person or group.
-7. Behaving in other ways that **threaten the well-being** of our community.
+1. **冒充身分。** 以任何理由冒充他人，或假裝成他人以逃避執行措施。
+2. **未註明來源。** 未適當標註你所貢獻內容的來源。
+3. **推廣材料。** 以不符合社群規範的方式分享行銷或其他商業內容。
+4. **不負責任的溝通。** 未能負責任地呈現包含、連結或描述任何其他禁止行為的內容。
 
-### Other Restrictions
+## 回報問題
 
-1. **Misleading identity.** Impersonating someone else for any reason, or pretending to be someone else to evade enforcement actions.
-2. **Failing to credit sources.** Not properly crediting the sources of content you contribute.
-3. **Promotional materials**. Sharing marketing or other commercial content in a way that is outside the norms of the community.
-4. **Irresponsible communication.** Failing to responsibly present content which includes, links or describes any other restricted behaviors.
+社群成員之間即使在盡力合作時也可能產生緊張關係。並非每個衝突都代表行為準則的違規，本行為準則旨在強化鼓勵的行為和規範，以幫助避免衝突並將傷害降至最低。
 
+當事件發生時，及時回報非常重要。如需回報可能的違規行為，請[開啟 Issue](https://github.com/RD-CAT/OnlinePixelAgents/issues) 或直接聯繫專案維護者。
 
-## Reporting an Issue
+社群管理員會認真對待違規回報，並盡一切努力及時回應。他們將調查所有行為準則違規的回報，審查訊息、日誌和記錄，或訪問證人和其他參與者。社群管理員將在優先考慮安全和保密的同時，盡可能保持調查和執行措施的透明度。為了維護這些價值，執行措施會與相關方私下進行，但向整個社群溝通可能是雙方同意的解決方案的一部分。
 
-Tensions can occur between community members even when they are trying their best to collaborate. Not every conflict represents a code of conduct violation, and this Code of Conduct reinforces encouraged behaviors and norms that can help avoid conflicts and minimize harm.
+## 處理和修復傷害
 
-When an incident does occur, it is important to report it promptly. To report a possible violation, **[NOTE: describe your means of reporting here.]**
+如果社群管理員的調查發現本行為準則遭到違反，可以使用以下執行階梯來決定如何最好地修復傷害，依據事件對相關個人和整個社群的影響。根據違規的嚴重程度，可以跳過較低的階梯。
 
-Community Moderators take reports of violations seriously and will make every effort to respond in a timely manner. They will investigate all reports of code of conduct violations, reviewing messages, logs, and recordings, or interviewing witnesses and other participants. Community Moderators will keep investigation and enforcement actions as transparent as possible while prioritizing safety and confidentiality. In order to honor these values, enforcement actions are carried out in private with the involved parties, but communicating to the whole community may be part of a mutually agreed upon resolution.
+1. **警告**
+   1. 事件：涉及單一事件或一系列事件的違規。
+   2. 後果：社群管理員發出私下書面警告。
+   3. 修復：修復範例包括私下書面道歉、承認責任，以及尋求對期望的釐清。
+2. **暫時限制活動**
+   1. 事件：之前已收到警告的違規重複發生，或首次發生較嚴重的違規。
+   2. 後果：私下書面警告附帶有時限的冷靜期，旨在強調情況的嚴重性，並給予相關社群成員處理事件的時間。冷靜期可能限於特定溝通管道或與特定社群成員的互動。
+   3. 修復：修復範例可能包括道歉、利用冷靜期反思行為和影響，以及在冷靜期結束後謹慎地重新進入社群空間。
+3. **暫時停權**
+   1. 事件：社群管理員已嘗試以警告處理的重複違規模式，或單一嚴重違規。
+   2. 後果：私下書面警告附帶恢復條件。一般來說，暫時停權給予被停權者時間反思其行為和可能的改正措施。
+   3. 修復：修復範例包括尊重停權的精神、滿足恢復的指定條件，以及在停權解除後謹慎地重新融入社群。
+4. **永久封禁**
+   1. 事件：其他階梯步驟未能解決的重複行為準則違規模式，或違規嚴重到社群管理員認為無法在此人作為成員的情況下保持社群安全。
+   2. 後果：移除對所有社群空間、工具和溝通管道的存取權。一般來說，永久封禁應很少使用，應有充分的理由支持，且僅在其他補救措施未能改變行為時才採用。
+   3. 修復：在此嚴重程度的情況下無法修復。
 
+此執行階梯僅作為指導方針，不限制社群管理員依據社群最佳利益行使裁量權和判斷的能力。
 
-## Addressing and Repairing Harm
+## 適用範圍
 
-**[NOTE: The remedies and repairs outlined below are suggestions based on best practices in code of conduct enforcement. If your community has its own established enforcement process, be sure to edit this section to describe your own policies.]**
+本行為準則適用於所有社群空間，也適用於個人在公共或其他空間正式代表社群時。代表社群的範例包括使用官方電子郵件地址、透過官方社群媒體帳號發文，或在線上或線下活動中擔任指定代表。
 
-If an investigation by the Community Moderators finds that this Code of Conduct has been violated, the following enforcement ladder may be used to determine how best to repair harm, based on the incident's impact on the individuals involved and the community as a whole. Depending on the severity of a violation, lower rungs on the ladder may be skipped.
+## 來源
 
-1) Warning
-   1) Event: A violation involving a single incident or series of incidents.
-   2) Consequence: A private, written warning from the Community Moderators.
-   3) Repair: Examples of repair include a private written apology, acknowledgement of responsibility, and seeking clarification on expectations.
-2) Temporarily Limited Activities
-   1) Event: A repeated incidence of a violation that previously resulted in a warning, or the first incidence of a more serious violation.
-   2) Consequence: A private, written warning with a time-limited cooldown period designed to underscore the seriousness of the situation and give the community members involved time to process the incident. The cooldown period may be limited to particular communication channels or interactions with particular community members.
-   3) Repair: Examples of repair may include making an apology, using the cooldown period to reflect on actions and impact, and being thoughtful about re-entering community spaces after the period is over.
-3) Temporary Suspension
-   1) Event: A pattern of repeated violation which the Community Moderators have tried to address with warnings, or a single serious violation.
-   2) Consequence: A private written warning with conditions for return from suspension. In general, temporary suspensions give the person being suspended time to reflect upon their behavior and possible corrective actions.
-   3) Repair: Examples of repair include respecting the spirit of the suspension, meeting the specified conditions for return, and being thoughtful about how to reintegrate with the community when the suspension is lifted.
-4) Permanent Ban
-   1) Event: A pattern of repeated code of conduct violations that other steps on the ladder have failed to resolve, or a violation so serious that the Community Moderators determine there is no way to keep the community safe with this person as a member.
-   2) Consequence: Access to all community spaces, tools, and communication channels is removed. In general, permanent bans should be rarely used, should have strong reasoning behind them, and should only be resorted to if working through other remedies has failed to change the behavior.
-   3) Repair: There is no possible repair in cases of this severity.
+本行為準則改編自 Contributor Covenant 3.0 版，永久連結：[https://www.contributor-covenant.org/version/3/0/](https://www.contributor-covenant.org/version/3/0/)。
 
-This enforcement ladder is intended as a guideline. It does not limit the ability of Community Managers to use their discretion and judgment, in keeping with the best interests of our community.
+Contributor Covenant 由 Organization for Ethical Source 管理，以 CC BY-SA 4.0 授權。授權條款請參見 [https://creativecommons.org/licenses/by-sa/4.0/](https://creativecommons.org/licenses/by-sa/4.0/)。
 
-
-## Scope
-
-This Code of Conduct applies within all community spaces, and also applies when an individual is officially representing the community in public or other spaces. Examples of representing our community include using an official email address, posting via an official social media account, or acting as an appointed representative at an online or offline event.
-
-
-## Attribution
-
-This Code of Conduct is adapted from the Contributor Covenant, version 3.0, permanently available at [https://www.contributor-covenant.org/version/3/0/](https://www.contributor-covenant.org/version/3/0/).
-
-Contributor Covenant is stewarded by the Organization for Ethical Source and licensed under CC BY-SA 4.0. To view a copy of this license, visit [https://creativecommons.org/licenses/by-sa/4.0/](https://creativecommons.org/licenses/by-sa/4.0/)
-
-For answers to common questions about Contributor Covenant, see the FAQ at [https://www.contributor-covenant.org/faq](https://www.contributor-covenant.org/faq). Translations are provided at [https://www.contributor-covenant.org/translations](https://www.contributor-covenant.org/translations). Additional enforcement and community guideline resources can be found at [https://www.contributor-covenant.org/resources](https://www.contributor-covenant.org/resources). The enforcement ladder was inspired by the work of [Mozilla’s code of conduct team](https://github.com/mozilla/inclusion).
+關於 Contributor Covenant 的常見問題，請參見 [FAQ](https://www.contributor-covenant.org/faq)。翻譯版本請參見[翻譯頁面](https://www.contributor-covenant.org/translations)。額外的執行和社群指導資源請參見[資源頁面](https://www.contributor-covenant.org/resources)。執行階梯靈感來自 [Mozilla 行為準則團隊](https://github.com/mozilla/inclusion)的工作。

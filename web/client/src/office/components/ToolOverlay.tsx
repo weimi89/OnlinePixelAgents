@@ -6,10 +6,23 @@ import { TILE_SIZE, CharacterState } from '../types.js'
 import { TOOL_OVERLAY_VERTICAL_OFFSET, CHARACTER_SITTING_OFFSET_PX } from '../../constants.js'
 import { t } from '../../i18n.js'
 
+/** Format raw model ID to short display name, e.g. "claude-opus-4-6" → "Opus 4.6" */
+function formatModelName(model: string): string {
+  // Match patterns like claude-{family}-{major}-{minor}[-extra]
+  const m = model.match(/^claude-(\w+)-(\d+)-(\d+)/)
+  if (m) {
+    const family = m[1].charAt(0).toUpperCase() + m[1].slice(1)
+    return `${family} ${m[2]}.${m[3]}`
+  }
+  // Fallback: strip "claude-" prefix if present
+  return model.replace(/^claude-/, '')
+}
+
 interface ToolOverlayProps {
   officeState: OfficeState
   agents: number[]
   agentTools: Record<number, ToolActivity[]>
+  agentModels: Record<number, string>
   subagentCharacters: SubagentCharacter[]
   containerRef: React.RefObject<HTMLDivElement | null>
   zoom: number
@@ -45,6 +58,7 @@ export function ToolOverlay({
   officeState,
   agents,
   agentTools,
+  agentModels,
   subagentCharacters,
   containerRef,
   zoom,
@@ -111,6 +125,9 @@ export function ToolOverlay({
         } else {
           activityText = getActivityText(id, agentTools, ch.isActive)
         }
+
+        // Get model display name
+        const modelName = !isSub && agentModels[id] ? formatModelName(agentModels[id]) : null
 
         // Determine dot color
         const tools = agentTools[id]
@@ -179,6 +196,18 @@ export function ToolOverlay({
               >
                 {activityText}
               </span>
+              {modelName && (
+                <span
+                  style={{
+                    fontSize: '16px',
+                    color: 'var(--pixel-text-dim)',
+                    flexShrink: 0,
+                    marginLeft: 2,
+                  }}
+                >
+                  {modelName}
+                </span>
+              )}
               {isSelected && !isSub && (
                 <button
                   onClick={(e) => {

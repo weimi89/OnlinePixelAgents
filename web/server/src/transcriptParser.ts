@@ -55,6 +55,13 @@ export function processTranscriptLine(
 		const record = JSON.parse(line);
 
 		if (record.type === 'assistant' && Array.isArray(record.message?.content)) {
+			// Extract model name from assistant records
+			const model = record.message?.model as string | undefined;
+			if (model && agent.model !== model) {
+				agent.model = model;
+				sender?.postMessage({ type: 'agentModel', id: agentId, model });
+			}
+
 			const blocks = record.message.content as Array<{
 				type: string; id?: string; name?: string; input?: Record<string, unknown>;
 			}>;

@@ -197,7 +197,7 @@ function spawnClaudeAgent(
 			removeAgent(
 				id, agents,
 				fileWatchers, pollingTimers, waitingTimers, permissionTimers,
-				jsonlPollTimers, persistAgents,
+				jsonlPollTimers, knownJsonlFiles, persistAgents,
 			);
 			sender?.postMessage({ type: 'agentClosed', id });
 		});
@@ -287,10 +287,14 @@ export function removeAgent(
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
 	jsonlPollTimers: Map<number, ReturnType<typeof setInterval>>,
+	knownJsonlFiles: Set<string>,
 	persistAgents: () => void,
 ): void {
 	const agent = agents.get(agentId);
 	if (!agent) return;
+
+	// Allow re-adoption if this session becomes active again
+	knownJsonlFiles.delete(agent.jsonlFile);
 
 	const jpTimer = jsonlPollTimers.get(agentId);
 	if (jpTimer) { clearInterval(jpTimer); }
@@ -317,6 +321,7 @@ export function closeAgent(
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
 	jsonlPollTimers: Map<number, ReturnType<typeof setInterval>>,
+	knownJsonlFiles: Set<string>,
 	sender: MessageSender | undefined,
 	persistAgents: () => void,
 ): void {
@@ -333,7 +338,7 @@ export function closeAgent(
 		agent.process.kill('SIGTERM');
 	}
 
-	removeAgent(agentId, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, jsonlPollTimers, persistAgents);
+	removeAgent(agentId, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, jsonlPollTimers, knownJsonlFiles, persistAgents);
 	sender?.postMessage({ type: 'agentClosed', id: agentId });
 }
 
@@ -433,6 +438,7 @@ export function checkTmuxHealth(
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
 	jsonlPollTimers: Map<number, ReturnType<typeof setInterval>>,
+	knownJsonlFiles: Set<string>,
 	sender: MessageSender | undefined,
 	persistAgents: () => void,
 ): void {
@@ -440,7 +446,7 @@ export function checkTmuxHealth(
 		if (!agent.tmuxSessionName) continue;
 		if (!isTmuxSessionAlive(agent.tmuxSessionName)) {
 			console.log(`[Pixel Agents] tmux session ${agent.tmuxSessionName} died, removing agent ${agentId}`);
-			removeAgent(agentId, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, jsonlPollTimers, persistAgents);
+			removeAgent(agentId, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, jsonlPollTimers, knownJsonlFiles, persistAgents);
 			sender?.postMessage({ type: 'agentClosed', id: agentId });
 		}
 	}

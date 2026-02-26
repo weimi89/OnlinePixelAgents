@@ -195,7 +195,7 @@ function scanAndAdopt(
 	}
 
 	// Check for stale agents (JSONL file no longer being written to)
-	checkStaleAgents(agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, jsonlPollTimers, sender, persistAgents);
+	checkStaleAgents(agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, jsonlPollTimers, knownJsonlFiles, sender, persistAgents);
 }
 
 /** Remove agents whose JSONL file hasn't been updated recently and have no managed process */
@@ -206,6 +206,7 @@ function checkStaleAgents(
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
 	jsonlPollTimers: Map<number, ReturnType<typeof setInterval>>,
+	knownJsonlFiles: Set<string>,
 	sender: MessageSender | undefined,
 	persistAgents: () => void,
 ): void {
@@ -227,7 +228,7 @@ function checkStaleAgents(
 		}
 	}
 	for (const id of staleIds) {
-		removeAgent(id, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, jsonlPollTimers, persistAgents);
+		removeAgent(id, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, jsonlPollTimers, knownJsonlFiles, persistAgents);
 		sender?.postMessage({ type: 'agentClosed', id });
 	}
 }

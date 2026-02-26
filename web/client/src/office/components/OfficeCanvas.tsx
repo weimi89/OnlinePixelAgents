@@ -32,6 +32,9 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const offsetRef = useRef({ x: 0, y: 0 })
+  // Ref for zoom so the game loop reads the latest value without restarting
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
   // Middle-mouse pan state (imperative, no re-renders)
   const isPanningRef = useRef(false)
   const panStartRef = useRef({ mouseX: 0, mouseY: 0, panX: 0, panY: 0 })
@@ -177,10 +180,11 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           const followCh = officeState.characters.get(officeState.cameraFollowId)
           if (followCh) {
             const layout = officeState.getLayout()
-            const mapW = layout.cols * TILE_SIZE * zoom
-            const mapH = layout.rows * TILE_SIZE * zoom
-            const targetX = mapW / 2 - followCh.x * zoom
-            const targetY = mapH / 2 - followCh.y * zoom
+            const z = zoomRef.current
+            const mapW = layout.cols * TILE_SIZE * z
+            const mapH = layout.rows * TILE_SIZE * z
+            const targetX = mapW / 2 - followCh.x * z
+            const targetY = mapH / 2 - followCh.y * z
             const dx = targetX - panRef.current.x
             const dy = targetY - panRef.current.y
             if (Math.abs(dx) < CAMERA_FOLLOW_SNAP_THRESHOLD && Math.abs(dy) < CAMERA_FOLLOW_SNAP_THRESHOLD) {
@@ -210,7 +214,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           officeState.tileMap,
           officeState.furniture,
           officeState.getCharacters(),
-          zoom,
+          zoomRef.current,
           panRef.current.x,
           panRef.current.y,
           selectionRender,
@@ -231,7 +235,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
       stop()
       observer.disconnect()
     }
-  }, [officeState, resizeCanvas, isEditMode, editorState, _editorTick, zoom, panRef])
+  }, [officeState, resizeCanvas, isEditMode, editorState, _editorTick, panRef])
 
   // Convert CSS mouse coords to world (sprite pixel) coords
   const screenToWorld = useCallback(

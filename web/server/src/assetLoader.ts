@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as fsp from 'fs/promises';
 import * as path from 'path';
 import { PNG } from 'pngjs';
 import {
@@ -102,7 +103,7 @@ export async function loadFurnitureAssets(assetsRoot: string): Promise<LoadedAss
 			return null;
 		}
 
-		const catalogContent = fs.readFileSync(catalogPath, 'utf-8');
+		const catalogContent = await fsp.readFile(catalogPath, 'utf-8');
 		const catalogData = JSON.parse(catalogContent);
 		const catalog: FurnitureAsset[] = catalogData.assets || [];
 		const sprites = new Map<string, string[][]>();
@@ -116,7 +117,7 @@ export async function loadFurnitureAssets(assetsRoot: string): Promise<LoadedAss
 				const assetPath = path.join(assetsRoot, filePath);
 				if (!fs.existsSync(assetPath)) continue;
 
-				const pngBuffer = fs.readFileSync(assetPath);
+				const pngBuffer = await fsp.readFile(assetPath);
 				const spriteData = pngToSpriteData(pngBuffer, asset.width, asset.height);
 				sprites.set(asset.id, spriteData);
 			} catch (err) {
@@ -132,14 +133,14 @@ export async function loadFurnitureAssets(assetsRoot: string): Promise<LoadedAss
 	}
 }
 
-export function loadDefaultLayout(assetsRoot: string): Record<string, unknown> | null {
+export async function loadDefaultLayout(assetsRoot: string): Promise<Record<string, unknown> | null> {
 	try {
 		const layoutPath = path.join(assetsRoot, 'assets', 'default-layout.json');
 		if (!fs.existsSync(layoutPath)) {
 			console.log('[AssetLoader] No default-layout.json found at:', layoutPath);
 			return null;
 		}
-		const content = fs.readFileSync(layoutPath, 'utf-8');
+		const content = await fsp.readFile(layoutPath, 'utf-8');
 		const layout = JSON.parse(content) as Record<string, unknown>;
 		console.log(`[AssetLoader] Loaded default layout (${layout.cols}x${layout.rows})`);
 		return layout;
@@ -157,7 +158,7 @@ export async function loadWallTiles(assetsRoot: string): Promise<LoadedWallTiles
 			return null;
 		}
 
-		const pngBuffer = fs.readFileSync(wallPath);
+		const pngBuffer = await fsp.readFile(wallPath);
 		const png = PNG.sync.read(pngBuffer);
 		const sprites: string[][][] = [];
 
@@ -200,7 +201,7 @@ export async function loadFloorTiles(assetsRoot: string): Promise<LoadedFloorTil
 			return null;
 		}
 
-		const pngBuffer = fs.readFileSync(floorPath);
+		const pngBuffer = await fsp.readFile(floorPath);
 		const png = PNG.sync.read(pngBuffer);
 		const sprites: string[][][] = [];
 
@@ -246,7 +247,7 @@ export async function loadCharacterSprites(assetsRoot: string): Promise<LoadedCh
 				return null;
 			}
 
-			const pngBuffer = fs.readFileSync(filePath);
+			const pngBuffer = await fsp.readFile(filePath);
 			const png = PNG.sync.read(pngBuffer);
 			const charData: CharacterDirectionSprites = { down: [], up: [], right: [] };
 

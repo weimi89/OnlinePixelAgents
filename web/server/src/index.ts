@@ -99,7 +99,7 @@ function startTmuxHealthCheck(sender: MessageSender): void {
 	tmuxHealthTimer = setInterval(() => {
 		checkTmuxHealth(
 			agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers,
-			jsonlPollTimers, sender, persistAgents,
+			jsonlPollTimers, knownJsonlFiles, sender, persistAgents,
 		);
 	}, TMUX_HEALTH_CHECK_INTERVAL_MS);
 }
@@ -150,7 +150,7 @@ async function main(): Promise<void> {
 	const assetsRoot = findAssetsRoot();
 	console.log(`[Pixel Agents] Assets root: ${assetsRoot}`);
 
-	defaultLayout = loadDefaultLayout(assetsRoot);
+	defaultLayout = await loadDefaultLayout(assetsRoot);
 	cachedCharSprites = await loadCharacterSprites(assetsRoot);
 	cachedFloorTiles = await loadFloorTiles(assetsRoot);
 	cachedWallTiles = await loadWallTiles(assetsRoot);
@@ -292,7 +292,7 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 			closeAgent(
 				id, agents,
 				fileWatchers, pollingTimers, waitingTimers, permissionTimers,
-				jsonlPollTimers, sender, persistAgents,
+				jsonlPollTimers, knownJsonlFiles, sender, persistAgents,
 			);
 			break;
 		}

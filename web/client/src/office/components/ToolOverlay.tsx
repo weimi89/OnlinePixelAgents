@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
 import type { ToolActivity } from '../types.js'
 import type { OfficeState } from '../engine/officeState.js'
 import type { SubagentCharacter } from '../../hooks/useExtensionMessages.js'
 import { TILE_SIZE, CharacterState } from '../types.js'
 import { TOOL_OVERLAY_VERTICAL_OFFSET, CHARACTER_SITTING_OFFSET_PX } from '../../constants.js'
 import { t } from '../../i18n.js'
+import { useRenderTick } from '../../hooks/useRenderTick.js'
 
 /** Format raw model ID to short display name, e.g. "claude-opus-4-6" → "Opus" */
 function formatModelName(model: string): string {
@@ -62,16 +62,7 @@ export function ToolOverlay({
   panRef,
   onCloseAgent,
 }: ToolOverlayProps) {
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    let rafId = 0
-    const tick = () => {
-      setTick((n) => n + 1)
-      rafId = requestAnimationFrame(tick)
-    }
-    rafId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafId)
-  }, [])
+  useRenderTick()
 
   const el = containerRef.current
   if (!el) return null

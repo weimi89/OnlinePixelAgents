@@ -37,6 +37,7 @@ const nextAgentIdRef = { current: 1 };
 const activeAgentIdRef = { current: null as number | null };
 const knownJsonlFiles = new Set<string>();
 const projectScanTimerRef = { current: null as ReturnType<typeof setInterval> | null };
+const tmuxRecoveredRef = { current: false };
 
 // Per-agent timers
 const fileWatchers = new Map<number, fs.FSWatcher>();
@@ -250,12 +251,15 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 				const demoCount = parseInt(process.env['DEMO_AGENTS'] || '3', 10);
 				startDemoMode(sender, demoCount);
 			} else {
-				// Recover tmux agents from previous server run BEFORE project scan
-				recoverTmuxAgents(
-					nextAgentIdRef, agents, knownJsonlFiles,
-					fileWatchers, pollingTimers, waitingTimers, permissionTimers,
-					sender, persistAgents,
-				);
+				// Recover tmux agents from previous server run BEFORE project scan (once only)
+				if (!tmuxRecoveredRef.current) {
+					tmuxRecoveredRef.current = true;
+					recoverTmuxAgents(
+						nextAgentIdRef, agents, knownJsonlFiles,
+						fileWatchers, pollingTimers, waitingTimers, permissionTimers,
+						sender, persistAgents,
+					);
+				}
 				// Re-send existing agents after recovery (includes recovered tmux agents)
 				sendExistingAgents(agents, agentMeta, sender);
 
@@ -265,7 +269,7 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 					projectDirs, knownJsonlFiles, projectScanTimerRef,
 					nextAgentIdRef, agents,
 					fileWatchers, pollingTimers, waitingTimers, permissionTimers,
-					sender, persistAgents,
+					jsonlPollTimers, sender, persistAgents,
 				);
 
 				// Start tmux health check

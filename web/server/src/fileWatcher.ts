@@ -3,6 +3,7 @@ import * as path from 'path';
 import type { AgentState, MessageSender } from './types.js';
 import { cancelWaitingTimer, cancelPermissionTimer, clearAgentActivity } from './timerManager.js';
 import { processTranscriptLine } from './transcriptParser.js';
+import { removeAgent } from './agentManager.js';
 import { FILE_WATCHER_POLL_INTERVAL_MS, PROJECT_SCAN_INTERVAL_MS, ACTIVE_JSONL_MAX_AGE_MS } from './constants.js';
 
 export function startFileWatching(
@@ -48,8 +49,11 @@ export function readNewLines(
 
 		const buf = Buffer.alloc(stat.size - agent.fileOffset);
 		const fd = fs.openSync(agent.jsonlFile, 'r');
-		fs.readSync(fd, buf, 0, buf.length, agent.fileOffset);
-		fs.closeSync(fd);
+		try {
+			fs.readSync(fd, buf, 0, buf.length, agent.fileOffset);
+		} finally {
+			fs.closeSync(fd);
+		}
 		agent.fileOffset = stat.size;
 
 		const text = agent.lineBuffer + buf.toString('utf-8');
@@ -103,6 +107,7 @@ export function ensureProjectScan(
 	pollingTimers: Map<number, ReturnType<typeof setInterval>>,
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
+	jsonlPollTimers: Map<number, ReturnType<typeof setInterval>>,
 	sender: MessageSender | undefined,
 	persistAgents: () => void,
 ): void {
@@ -113,7 +118,7 @@ export function ensureProjectScan(
 		scanAndAdopt(
 			dir, knownJsonlFiles, nextAgentIdRef, agents,
 			fileWatchers, pollingTimers, waitingTimers, permissionTimers,
-			sender, persistAgents,
+			jsonlPollTimers, sender, persistAgents,
 		);
 	}
 
@@ -123,7 +128,7 @@ export function ensureProjectScan(
 			scanAndAdopt(
 				dir, knownJsonlFiles, nextAgentIdRef, agents,
 				fileWatchers, pollingTimers, waitingTimers, permissionTimers,
-				sender, persistAgents,
+				jsonlPollTimers, sender, persistAgents,
 			);
 		}
 	}, PROJECT_SCAN_INTERVAL_MS);
@@ -138,6 +143,7 @@ function scanAndAdopt(
 	pollingTimers: Map<number, ReturnType<typeof setInterval>>,
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
+	jsonlPollTimers: Map<number, ReturnType<typeof setInterval>>,
 	sender: MessageSender | undefined,
 	persistAgents: () => void,
 ): void {
@@ -189,7 +195,7 @@ function scanAndAdopt(
 	}
 
 	// Check for stale agents (JSONL file no longer being written to)
-	checkStaleAgents(agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, sender, persistAgents);
+	checkStaleAgents(agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, jsonlPollTimers, sender, persistAgents);
 }
 
 /** Remove agents whose JSONL file hasn't been updated recently and have no managed process */
@@ -199,42 +205,30 @@ function checkStaleAgents(
 	pollingTimers: Map<number, ReturnType<typeof setInterval>>,
 	waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
+	jsonlPollTimers: Map<number, ReturnType<typeof setInterval>>,
 	sender: MessageSender | undefined,
 	persistAgents: () => void,
 ): void {
+	const staleIds: number[] = [];
 	for (const [id, agent] of agents) {
-		// Only check auto-adopted agents (no managed process)
-		if (agent.process) continue;
+		// Only check auto-adopted agents (no managed process, no tmux session)
+		if (agent.process || agent.tmuxSessionName) continue;
 		try {
 			const stat = fs.statSync(agent.jsonlFile);
 			const age = Date.now() - stat.mtimeMs;
 			// If file hasn't been touched in 2× the threshold, consider stale
 			if (age > ACTIVE_JSONL_MAX_AGE_MS * 2) {
 				console.log(`[Pixel Agents] Agent ${id}: session stale (${Math.round(age / 1000)}s), removing`);
-				fileWatchers.get(id)?.close();
-				fileWatchers.delete(id);
-				const pt = pollingTimers.get(id);
-				if (pt) { clearInterval(pt); }
-				pollingTimers.delete(id);
-				cancelWaitingTimer(id, waitingTimers);
-				cancelPermissionTimer(id, permissionTimers);
-				agents.delete(id);
-				persistAgents();
-				sender?.postMessage({ type: 'agentClosed', id });
+				staleIds.push(id);
 			}
 		} catch {
 			// File gone — remove agent
-			fileWatchers.get(id)?.close();
-			fileWatchers.delete(id);
-			const pt = pollingTimers.get(id);
-			if (pt) { clearInterval(pt); }
-			pollingTimers.delete(id);
-			cancelWaitingTimer(id, waitingTimers);
-			cancelPermissionTimer(id, permissionTimers);
-			agents.delete(id);
-			persistAgents();
-			sender?.postMessage({ type: 'agentClosed', id });
+			staleIds.push(id);
 		}
+	}
+	for (const id of staleIds) {
+		removeAgent(id, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, jsonlPollTimers, persistAgents);
+		sender?.postMessage({ type: 'agentClosed', id });
 	}
 }
 

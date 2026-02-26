@@ -39,13 +39,13 @@ const DEMO_TOOL_SEQUENCES: DemoTool[][] = [
 interface DemoAgent {
 	id: number;
 	currentSequence: number;
-	timer: ReturnType<typeof setTimeout> | null;
+	timers: ReturnType<typeof setTimeout>[];
 }
 
 const demoAgents: DemoAgent[] = [];
 let nextDemoId = 1;
 let demoSender: MessageSender | undefined;
-let spawnTimer: ReturnType<typeof setTimeout> | null = null;
+const spawnTimers: ReturnType<typeof setTimeout>[] = [];
 
 function randomInt(min: number, max: number): number {
 	return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -67,7 +67,7 @@ function runToolSequence(agent: DemoAgent): void {
 		const toolId = `demo-${agent.id}-${agent.currentSequence}-${i}`;
 
 		// Start tool
-		agent.timer = setTimeout(() => {
+		agent.timers.push(setTimeout(() => {
 			sender.postMessage({
 				type: 'agentToolStart',
 				id: agent.id,
@@ -90,7 +90,7 @@ function runToolSequence(agent: DemoAgent): void {
 					status: 'Reading README.md',
 				});
 				// Sub-agent tool done after a bit
-				setTimeout(() => {
+				agent.timers.push(setTimeout(() => {
 					sender.postMessage({
 						type: 'subagentToolDone',
 						id: agent.id,
@@ -98,7 +98,7 @@ function runToolSequence(agent: DemoAgent): void {
 						toolId: `${toolId}-sub-0`,
 					});
 					// Second sub-agent tool
-					setTimeout(() => {
+					agent.timers.push(setTimeout(() => {
 						sender.postMessage({
 							type: 'subagentToolStart',
 							id: agent.id,
@@ -106,23 +106,23 @@ function runToolSequence(agent: DemoAgent): void {
 							toolId: `${toolId}-sub-1`,
 							status: 'Searching code',
 						});
-						setTimeout(() => {
+						agent.timers.push(setTimeout(() => {
 							sender.postMessage({
 								type: 'subagentToolDone',
 								id: agent.id,
 								parentToolId: toolId,
 								toolId: `${toolId}-sub-1`,
 							});
-						}, 1500);
-					}, 500);
-				}, 2000);
+						}, 1500));
+					}, 500));
+				}, 2000));
 			}
-		}, delay);
+		}, delay));
 
 		delay += tool.duration;
 
 		// End tool
-		agent.timer = setTimeout(() => {
+		agent.timers.push(setTimeout(() => {
 			sender.postMessage({
 				type: 'agentToolDone',
 				id: agent.id,
@@ -135,13 +135,13 @@ function runToolSequence(agent: DemoAgent): void {
 					parentToolId: toolId,
 				});
 			}
-		}, delay);
+		}, delay));
 
 		delay += randomInt(300, 800); // gap between tools
 	}
 
 	// After all tools done → waiting state
-	agent.timer = setTimeout(() => {
+	agent.timers.push(setTimeout(() => {
 		sender.postMessage({
 			type: 'agentStatus',
 			id: agent.id,
@@ -149,11 +149,11 @@ function runToolSequence(agent: DemoAgent): void {
 		});
 		// After waiting period, start next sequence
 		const waitTime = randomInt(3000, 8000);
-		agent.timer = setTimeout(() => {
+		agent.timers.push(setTimeout(() => {
 			agent.currentSequence++;
 			runToolSequence(agent);
-		}, waitTime);
-	}, delay + 500);
+		}, waitTime));
+	}, delay + 500));
 }
 
 export function startDemoMode(sender: MessageSender, agentCount: number = 3): void {
@@ -162,12 +162,12 @@ export function startDemoMode(sender: MessageSender, agentCount: number = 3): vo
 
 	// Spawn agents with staggered timing
 	for (let i = 0; i < agentCount; i++) {
-		spawnTimer = setTimeout(() => {
+		spawnTimers.push(setTimeout(() => {
 			const id = nextDemoId++;
 			const agent: DemoAgent = {
 				id,
 				currentSequence: 0,
-				timer: null,
+				timers: [],
 			};
 			demoAgents.push(agent);
 			sender.postMessage({ type: 'agentCreated', id });
@@ -177,21 +177,21 @@ export function startDemoMode(sender: MessageSender, agentCount: number = 3): vo
 			console.log(`[Pixel Agents] Demo agent ${id} created`);
 
 			// Start activity after a short delay
-			setTimeout(() => {
+			agent.timers.push(setTimeout(() => {
 				runToolSequence(agent);
-			}, randomInt(1000, 3000));
-		}, i * 1500);
+			}, randomInt(1000, 3000)));
+		}, i * 1500));
 	}
 }
 
 export function stopDemoMode(): void {
-	if (spawnTimer) {
-		clearTimeout(spawnTimer);
-		spawnTimer = null;
+	for (const t of spawnTimers) {
+		clearTimeout(t);
 	}
+	spawnTimers.length = 0;
 	for (const agent of demoAgents) {
-		if (agent.timer) {
-			clearTimeout(agent.timer);
+		for (const t of agent.timers) {
+			clearTimeout(t);
 		}
 	}
 	demoAgents.length = 0;

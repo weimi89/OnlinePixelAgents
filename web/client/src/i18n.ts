@@ -59,6 +59,10 @@ export const t = {
   yes: '是',
   no: '否',
 
+  // Error Boundary
+  errorOccurred: '發生錯誤',
+  retry: '重試',
+
   // Loading
   loading: '載入中...',
 

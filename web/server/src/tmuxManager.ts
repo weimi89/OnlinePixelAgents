@@ -47,6 +47,9 @@ export function createTmuxSession(
 		stdio: 'ignore',
 		shell: true,
 	});
+	tmux.on('error', (err) => {
+		console.error(`[Pixel Agents] Failed to create tmux session ${sessionName}:`, err);
+	});
 	tmux.unref();
 }
 

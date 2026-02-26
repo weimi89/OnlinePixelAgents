@@ -16,6 +16,8 @@ export function useEditorKeyboard(
   useEffect(() => {
     if (!isEditMode) return
     const handler = (e: KeyboardEvent) => {
+      // Skip when focus is on input elements (e.g. settings modal)
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return
       if (e.key === 'Escape') {
         // Multi-stage Esc: deselect item → close tool → deselect placed → close editor
         if (editorState.activeTool === EditTool.FURNITURE_PICK) {

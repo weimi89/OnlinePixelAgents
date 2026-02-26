@@ -74,11 +74,14 @@ function extractSessionInfo(
 	stat: fs.Stats,
 	isActive: boolean,
 ): SessionInfo | null {
-	const fd = fs.openSync(filePath, 'r');
 	const readSize = Math.min(stat.size, SESSION_SCAN_READ_BYTES);
 	const buf = Buffer.alloc(readSize);
-	fs.readSync(fd, buf, 0, readSize, 0);
-	fs.closeSync(fd);
+	const fd = fs.openSync(filePath, 'r');
+	try {
+		fs.readSync(fd, buf, 0, readSize, 0);
+	} finally {
+		fs.closeSync(fd);
+	}
 
 	const text = buf.toString('utf-8');
 	const lines = text.split('\n');

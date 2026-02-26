@@ -6,15 +6,12 @@ import { TILE_SIZE, CharacterState } from '../types.js'
 import { TOOL_OVERLAY_VERTICAL_OFFSET, CHARACTER_SITTING_OFFSET_PX } from '../../constants.js'
 import { t } from '../../i18n.js'
 
-/** Format raw model ID to short display name, e.g. "claude-opus-4-6" → "Opus 4.6" */
+/** Format raw model ID to short display name, e.g. "claude-opus-4-6" → "Opus" */
 function formatModelName(model: string): string {
-  // Match patterns like claude-{family}-{major}-{minor}[-extra]
-  const m = model.match(/^claude-(\w+)-(\d+)-(\d+)/)
+  const m = model.match(/^claude-(\w+)/)
   if (m) {
-    const family = m[1].charAt(0).toUpperCase() + m[1].slice(1)
-    return `${family} ${m[2]}.${m[3]}`
+    return m[1].charAt(0).toUpperCase() + m[1].slice(1)
   }
-  // Fallback: strip "claude-" prefix if present
   return model.replace(/^claude-/, '')
 }
 

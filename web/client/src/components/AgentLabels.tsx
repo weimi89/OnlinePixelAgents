@@ -4,12 +4,11 @@ import type { SubagentCharacter } from '../hooks/useExtensionMessages.js'
 import { TILE_SIZE, CharacterState } from '../office/types.js'
 import { t } from '../i18n.js'
 
-/** Format raw model ID to short display name, e.g. "claude-opus-4-6" → "Opus 4.6" */
+/** Format raw model ID to short display name, e.g. "claude-opus-4-6" → "Opus" */
 function formatModelName(model: string): string {
-  const m = model.match(/^claude-(\w+)-(\d+)-(\d+)/)
+  const m = model.match(/^claude-(\w+)/)
   if (m) {
-    const family = m[1].charAt(0).toUpperCase() + m[1].slice(1)
-    return `${family} ${m[2]}.${m[3]}`
+    return m[1].charAt(0).toUpperCase() + m[1].slice(1)
   }
   return model.replace(/^claude-/, '')
 }
@@ -77,14 +76,14 @@ export function AgentLabels({
         // Character position: device pixels → CSS pixels (follow sitting offset)
         const sittingOffset = ch.state === CharacterState.TYPE ? 6 : 0
         const screenX = (deviceOffsetX + ch.x * zoom) / dpr
-        const screenY = (deviceOffsetY + (ch.y + sittingOffset - 24) * zoom) / dpr
+        const screenY = (deviceOffsetY + (ch.y + sittingOffset - 46) * zoom) / dpr
 
         const status = agentStatuses[id]
         const isWaiting = status === 'waiting'
         const isActive = ch.isActive
         const isSub = ch.isSubagent
 
-        let dotColor = 'transparent'
+        let dotColor: string | null = null
         if (isWaiting) {
           dotColor = '#cca700'
         } else if (isActive) {
@@ -100,34 +99,22 @@ export function AgentLabels({
             style={{
               position: 'absolute',
               left: screenX,
-              top: screenY - 16,
+              top: screenY,
               transform: 'translateX(-50%)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
               pointerEvents: 'none',
               zIndex: 40,
             }}
           >
-            {dotColor !== 'transparent' && (
-              <span
-                className={isActive && !isWaiting ? 'pixel-agents-pulse' : undefined}
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: dotColor,
-                  marginBottom: 2,
-                }}
-              />
-            )}
             <span
               style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
                 fontSize: isSub ? '16px' : '18px',
                 fontStyle: isSub ? 'italic' : undefined,
                 color: 'var(--pixel-text)',
                 background: 'rgba(30,30,46,0.7)',
-                padding: '1px 4px',
+                padding: '1px 5px',
                 borderRadius: 2,
                 whiteSpace: 'nowrap',
                 maxWidth: isSub ? 120 : undefined,
@@ -135,6 +122,18 @@ export function AgentLabels({
                 textOverflow: isSub ? 'ellipsis' : undefined,
               }}
             >
+              {dotColor && (
+                <span
+                  className={isActive && !isWaiting ? 'pixel-agents-pulse' : undefined}
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: dotColor,
+                    flexShrink: 0,
+                  }}
+                />
+              )}
               {labelText}
             </span>
           </div>

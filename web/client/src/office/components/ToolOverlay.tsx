@@ -111,8 +111,11 @@ export function ToolOverlay({
 
         // Get activity text
         const subHasPermission = isSub && ch.bubbleType === 'permission'
+        const isDetached = ch.isDetached
         let activityText: string
-        if (isSub) {
+        if (isDetached) {
+          activityText = t.detached
+        } else if (isSub) {
           if (subHasPermission) {
             activityText = t.needsApproval
           } else {
@@ -133,7 +136,9 @@ export function ToolOverlay({
         const isActive = ch.isActive
 
         let dotColor: string | null = null
-        if (hasPermission) {
+        if (isDetached) {
+          dotColor = 'var(--pixel-status-detached)'
+        } else if (hasPermission) {
           dotColor = 'var(--pixel-status-permission)'
         } else if (isActive && hasActiveTools) {
           dotColor = 'var(--pixel-status-active)'

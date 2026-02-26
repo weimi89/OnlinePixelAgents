@@ -75,8 +75,9 @@ export function AgentLabels({
 
         // Character position: device pixels → CSS pixels (follow sitting offset)
         const sittingOffset = ch.state === CharacterState.TYPE ? 14 : 0
-        // Hide label when a speech bubble is showing (let the bubble be visible alone)
-        if (ch.bubbleType) return null
+        // Hide label when a non-detached speech bubble is showing (let the bubble be visible alone)
+        // Detached bubble is persistent — show the label alongside it
+        if (ch.bubbleType && ch.bubbleType !== 'detached') return null
 
         const screenX = (deviceOffsetX + ch.x * zoom) / dpr
         const screenY = (deviceOffsetY + (ch.y + sittingOffset - 46) * zoom) / dpr
@@ -85,16 +86,21 @@ export function AgentLabels({
         const isWaiting = status === 'waiting'
         const isActive = ch.isActive
         const isSub = ch.isSubagent
+        const isDetached = ch.isDetached
 
         let dotColor: string | null = null
-        if (isWaiting) {
+        if (isDetached) {
+          dotColor = 'var(--pixel-status-detached)'
+        } else if (isWaiting) {
           dotColor = '#cca700'
         } else if (isActive) {
           dotColor = '#3794ff'
         }
 
         const modelDisplay = agentModels[id] ? formatModelName(agentModels[id]) : null
-        const labelText = subLabelMap.get(id) || (modelDisplay ? `${modelDisplay}` : t.agent(id))
+        const labelText = isDetached
+          ? t.detached
+          : (subLabelMap.get(id) || (modelDisplay ? `${modelDisplay}` : t.agent(id)))
 
         return (
           <div

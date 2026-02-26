@@ -49,6 +49,7 @@
   /* Status dot colors */
   --pixel-status-permission: #cca700;
   --pixel-status-active: #3794ff;
+  --pixel-status-detached: #888;
 
   /* ToolOverlay z-index layers */
   --pixel-overlay-z: 100;

@@ -1,7 +1,7 @@
 import { TileType, TILE_SIZE, CharacterState } from '../types.js'
 import type { TileType as TileTypeVal, FurnitureInstance, Character, SpriteData, Seat, FloorColor } from '../types.js'
 import { getCachedSprite, getOutlineSprite } from '../sprites/spriteCache.js'
-import { getCharacterSprites, BUBBLE_PERMISSION_SPRITE, BUBBLE_WAITING_SPRITE } from '../sprites/spriteData.js'
+import { getCharacterSprites, BUBBLE_PERMISSION_SPRITE, BUBBLE_WAITING_SPRITE, BUBBLE_DETACHED_SPRITE } from '../sprites/spriteData.js'
 import { getCharacterSprite } from './characters.js'
 import { renderMatrixEffect } from './matrixEffect.js'
 import { getColorizedFloorSprite, hasFloorSprites, WALL_COLOR } from '../floorTiles.js'
@@ -38,6 +38,7 @@ import {
   SELECTION_HIGHLIGHT_COLOR,
   DELETE_BUTTON_BG,
   ROTATE_BUTTON_BG,
+  DETACHED_CHARACTER_ALPHA,
 } from '../../constants.js'
 
 // ── Render functions ────────────────────────────────────────────
@@ -170,10 +171,19 @@ export function renderScene(
       })
     }
 
+    // Detached characters render at reduced opacity
+    const isDetached = ch.isDetached
     drawables.push({
       zY: charZY,
       draw: (c) => {
+        if (isDetached) {
+          c.save()
+          c.globalAlpha = DETACHED_CHARACTER_ALPHA
+        }
         c.drawImage(cached, drawX, drawY)
+        if (isDetached) {
+          c.restore()
+        }
       },
     })
   }
@@ -459,7 +469,9 @@ export function renderBubbles(
 
     const sprite = ch.bubbleType === 'permission'
       ? BUBBLE_PERMISSION_SPRITE
-      : BUBBLE_WAITING_SPRITE
+      : ch.bubbleType === 'detached'
+        ? BUBBLE_DETACHED_SPRITE
+        : BUBBLE_WAITING_SPRITE
 
     // Compute opacity: permission = full, waiting = fade in last 0.5s
     let alpha = 1.0

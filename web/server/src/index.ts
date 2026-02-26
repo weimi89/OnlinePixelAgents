@@ -18,7 +18,7 @@ import {
 } from './assetLoader.js';
 import type { LoadedAssets, LoadedFloorTiles, LoadedWallTiles, LoadedCharacterSprites } from './assetLoader.js';
 import { writeLayoutToFile, loadLayout } from './layoutPersistence.js';
-import { launchNewAgent, closeAgent, sendExistingAgents, getAllProjectDirs, resumeSession } from './agentManager.js';
+import { launchNewAgent, closeAgent, sendExistingAgents, getAllProjectDirs, resumeSession, recoverTmuxAgents, checkTmuxHealth, savePersistedAgents } from './agentManager.js';
 import { scanAllSessions } from './sessionScanner.js';
 import { ensureProjectScan } from './fileWatcher.js';
 import {
@@ -26,6 +26,7 @@ import {
 	LAYOUT_FILE_DIR,
 	SETTINGS_FILE_NAME,
 	AGENT_SEATS_FILE_NAME,
+	TMUX_HEALTH_CHECK_INTERVAL_MS,
 } from './constants.js';
 import { isDemoEnabled, startDemoMode, stopDemoMode } from './demoMode.js';
 
@@ -85,7 +86,21 @@ function writeJsonFile(filePath: string, data: unknown): void {
 }
 
 function persistAgents(): void {
-	// For Phase 1 we don't persist agents across restarts
+	savePersistedAgents(agents);
+}
+
+// ── tmux health check ───────────────────────────────────────
+
+let tmuxHealthTimer: ReturnType<typeof setInterval> | null = null;
+
+function startTmuxHealthCheck(sender: MessageSender): void {
+	if (tmuxHealthTimer) return;
+	tmuxHealthTimer = setInterval(() => {
+		checkTmuxHealth(
+			agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers,
+			jsonlPollTimers, sender, persistAgents,
+		);
+	}, TMUX_HEALTH_CHECK_INTERVAL_MS);
 }
 
 // ── Determine working directory ──────────────────────────────
@@ -235,6 +250,15 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 				const demoCount = parseInt(process.env['DEMO_AGENTS'] || '3', 10);
 				startDemoMode(sender, demoCount);
 			} else {
+				// Recover tmux agents from previous server run BEFORE project scan
+				recoverTmuxAgents(
+					nextAgentIdRef, agents, knownJsonlFiles,
+					fileWatchers, pollingTimers, waitingTimers, permissionTimers,
+					sender, persistAgents,
+				);
+				// Re-send existing agents after recovery (includes recovered tmux agents)
+				sendExistingAgents(agents, agentMeta, sender);
+
 				// Start project scan — auto-detect running Claude sessions across ALL projects
 				const projectDirs = getAllProjectDirs();
 				ensureProjectScan(
@@ -243,6 +267,9 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 					fileWatchers, pollingTimers, waitingTimers, permissionTimers,
 					sender, persistAgents,
 				);
+
+				// Start tmux health check
+				startTmuxHealthCheck(sender);
 			}
 			break;
 		}

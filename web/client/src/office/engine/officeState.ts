@@ -491,6 +491,20 @@ export class OfficeState {
     return this.subagentIdMap.get(`${parentAgentId}:${parentToolId}`) ?? null
   }
 
+  setAgentDetached(id: number, detached: boolean): void {
+    const ch = this.characters.get(id)
+    if (ch) {
+      ch.isDetached = detached
+      if (detached) {
+        ch.bubbleType = 'detached'
+        ch.bubbleTimer = 0
+      } else if (ch.bubbleType === 'detached') {
+        ch.bubbleType = null
+        ch.bubbleTimer = 0
+      }
+    }
+  }
+
   setAgentActive(id: number, active: boolean): void {
     const ch = this.characters.get(id)
     if (ch) {
@@ -635,7 +649,7 @@ export class OfficeState {
         updateCharacter(ch, dt, this.walkableTiles, this.seats, this.tileMap, this.blockedTiles)
       )
 
-      // Tick bubble timer for waiting bubbles
+      // Tick bubble timer for waiting bubbles (not permission/detached)
       if (ch.bubbleType === 'waiting') {
         ch.bubbleTimer -= dt
         if (ch.bubbleTimer <= 0) {

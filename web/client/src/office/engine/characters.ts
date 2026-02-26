@@ -70,6 +70,7 @@ export function createCharacter(
     wanderLimit: randomInt(WANDER_MOVES_BEFORE_REST_MIN, WANDER_MOVES_BEFORE_REST_MAX),
     isActive: true,
     seatId,
+    isDetached: false,
     bubbleType: null,
     bubbleTimer: 0,
     seatTimer: 0,

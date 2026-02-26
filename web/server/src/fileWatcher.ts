@@ -175,6 +175,8 @@ function scanAndAdopt(
 			permissionSent: false,
 			hadToolsInTurn: false,
 			model: null,
+			tmuxSessionName: null,
+			isDetached: false,
 		};
 		agents.set(id, agent);
 		persistAgents();

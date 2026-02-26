@@ -68,6 +68,9 @@ export const t = {
   // Model
   unknownModel: '未知模型',
 
+  // Detached (tmux)
+  detached: '已斷線',
+
   // Session Picker
   sessions: '工作階段',
   browseSessions: '瀏覽過去的工作階段',

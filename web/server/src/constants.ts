@@ -34,5 +34,8 @@ export const AGENT_SEATS_FILE_NAME = 'agent-seats.json';
 // ── Auto-detection ──────────────────────────────────────────
 export const ACTIVE_JSONL_MAX_AGE_MS = 30_000; // 30s — files modified within this window are "active"
 
+// ── tmux ─────────────────────────────────────────────────────
+export const TMUX_HEALTH_CHECK_INTERVAL_MS = 5000;
+
 // ── Server ──────────────────────────────────────────────────
 export const DEFAULT_PORT = 3000;

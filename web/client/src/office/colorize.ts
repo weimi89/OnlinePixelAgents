@@ -7,8 +7,9 @@
  */
 
 import type { SpriteData, FloorColor } from './types.js'
+import { COLORIZE_CACHE_MAX_SIZE } from '../constants.js'
 
-/** 通用著色精靈圖快取：任意字串鍵 → SpriteData */
+/** 通用著色精靈圖快取：任意字串鍵 → SpriteData（LRU，最大 COLORIZE_CACHE_MAX_SIZE） */
 const colorizeCache = new Map<string, SpriteData>()
 
 /**
@@ -18,9 +19,19 @@ const colorizeCache = new Map<string, SpriteData>()
  */
 export function getColorizedSprite(cacheKey: string, sprite: SpriteData, color: FloorColor): SpriteData {
   const cached = colorizeCache.get(cacheKey)
-  if (cached) return cached
+  if (cached) {
+    // LRU：移至末尾（最近使用）
+    colorizeCache.delete(cacheKey)
+    colorizeCache.set(cacheKey, cached)
+    return cached
+  }
   const result = color.colorize ? colorizeSprite(sprite, color) : adjustSprite(sprite, color)
   colorizeCache.set(cacheKey, result)
+  // 超過限制時刪除最舊的條目
+  if (colorizeCache.size > COLORIZE_CACHE_MAX_SIZE) {
+    const oldest = colorizeCache.keys().next().value!
+    colorizeCache.delete(oldest)
+  }
   return result
 }
 
@@ -84,7 +95,7 @@ export function colorizeSprite(sprite: SpriteData, color: FloorColor): SpriteDat
 }
 
 /** 將 HSL（h: 0-360, s: 0-1, l: 0-1）轉換為 #RRGGBB hex 字串 */
-function hslToHex(h: number, s: number, l: number): string {
+export function hslToHex(h: number, s: number, l: number): string {
   const c = (1 - Math.abs(2 * l - 1)) * s
   const hp = h / 60
   const x = c * (1 - Math.abs(hp % 2 - 1))

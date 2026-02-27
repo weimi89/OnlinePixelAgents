@@ -105,6 +105,7 @@ const ctx: AgentContext = {
 	jsonlPollTimers,
 	sender: undefined,
 	persistAgents,
+	trackedJsonlFiles: new Map(),
 };
 
 // ── tmux 健康檢查 ───────────────────────────────────────

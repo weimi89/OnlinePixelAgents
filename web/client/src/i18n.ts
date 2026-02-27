@@ -88,4 +88,18 @@ export const t = {
 
   // 連線狀態
   disconnected: '已斷線，重連中...',
+
+  // 子任務
+  subtask: '子任務',
+
+  // 時間格式
+  timeAgoSeconds: (n: number) => `${n} 秒前`,
+  timeAgoMinutes: (n: number) => `${n} 分鐘前`,
+  timeAgoHours: (n: number) => `${n} 小時前`,
+  timeAgoDays: (n: number) => `${n} 天前`,
+  timeAgoMonths: (n: number) => `${n} 個月前`,
+
+  // 佈局匯入驗證
+  invalidLayoutFile: '無效的佈局檔案',
+  parseLayoutFailed: '解析佈局檔案失敗',
 } as const

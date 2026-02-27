@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import type { OfficeState } from '../office/engine/officeState.js'
 import type { EditorState } from '../office/editor/editorState.js'
 import { EditTool } from '../office/types.js'
@@ -52,6 +52,11 @@ export function useEditorActions(
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const panRef = useRef({ x: 0, y: 0 })
   const lastSavedLayoutRef = useRef<OfficeLayout | null>(null)
+
+  // 卸載時清除待處理的防抖儲存計時器
+  useEffect(() => () => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+  }, [])
 
   // 由 useExtensionMessages 在 layoutLoaded 時呼叫，設定初始檢查點
   const setLastSavedLayout = useCallback((layout: OfficeLayout) => {

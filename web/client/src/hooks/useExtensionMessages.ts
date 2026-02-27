@@ -73,10 +73,9 @@ export function useExtensionMessages(
   const [loadedAssets, setLoadedAssets] = useState<{ catalog: FurnitureAsset[]; sprites: Record<string, string[][]> } | undefined>()
 
   const layoutReadyRef = useRef(false)
+  const pendingAgentsRef = useRef<Array<{ id: number; palette?: number; hueShift?: number; seatId?: string }>>([])
 
   useEffect(() => {
-    let pendingAgents: Array<{ id: number; palette?: number; hueShift?: number; seatId?: string }> = []
-
     const handler = (data: unknown) => {
       const msg = data as ServerMessage
       const os = getOfficeState()
@@ -94,10 +93,10 @@ export function useExtensionMessages(
         } else {
           onLayoutLoaded?.(os.getLayout())
         }
-        for (const p of pendingAgents) {
+        for (const p of pendingAgentsRef.current) {
           os.addAgent(p.id, p.palette, p.hueShift, p.seatId, true)
         }
-        pendingAgents = []
+        pendingAgentsRef.current = []
         layoutReadyRef.current = true
         setLayoutReady(true)
         if (os.characters.size > 0) {
@@ -148,7 +147,7 @@ export function useExtensionMessages(
           if (layoutReadyRef.current) {
             os.addAgent(id, m?.palette, m?.hueShift, m?.seatId, true)
           } else {
-            pendingAgents.push({ id, palette: m?.palette, hueShift: m?.hueShift, seatId: m?.seatId })
+            pendingAgentsRef.current.push({ id, palette: m?.palette, hueShift: m?.hueShift, seatId: m?.seatId })
           }
         }
         if (layoutReadyRef.current && incoming.length > 0) {

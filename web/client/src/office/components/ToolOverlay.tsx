@@ -103,7 +103,7 @@ export function ToolOverlay({
             activityText = t.needsApproval
           } else {
             const sub = subagentCharacters.find((s) => s.id === id)
-            activityText = sub ? sub.label : 'Subtask'
+            activityText = sub ? sub.label : t.subtask
           }
         } else {
           activityText = getActivityText(id, agentTools, ch.isActive)

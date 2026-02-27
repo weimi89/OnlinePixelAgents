@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
 import { PNG } from 'pngjs';
+import { rgbToHex } from './colorUtils.js';
 import {
 	PNG_ALPHA_THRESHOLD,
 	WALL_PIECE_WIDTH,
@@ -78,8 +79,7 @@ function pngToSpriteData(pngBuffer: Buffer, width: number, height: number): stri
 				if (a < PNG_ALPHA_THRESHOLD) {
 					row.push('');
 				} else {
-					const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase();
-					row.push(hex);
+					row.push(rgbToHex(r, g, b));
 				}
 			}
 			sprite.push(row);
@@ -177,7 +177,7 @@ export async function loadWallTiles(assetsRoot: string): Promise<LoadedWallTiles
 					if (av < PNG_ALPHA_THRESHOLD) {
 						row.push('');
 					} else {
-						row.push(`#${rv.toString(16).padStart(2, '0')}${gv.toString(16).padStart(2, '0')}${bv.toString(16).padStart(2, '0')}`.toUpperCase());
+						row.push(rgbToHex(rv, gv, bv));
 					}
 				}
 				sprite.push(row);
@@ -219,7 +219,7 @@ export async function loadFloorTiles(assetsRoot: string): Promise<LoadedFloorTil
 					if (a < PNG_ALPHA_THRESHOLD) {
 						row.push('');
 					} else {
-						row.push(`#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase());
+						row.push(rgbToHex(r, g, b));
 					}
 				}
 				sprite.push(row);
@@ -270,7 +270,7 @@ export async function loadCharacterSprites(assetsRoot: string): Promise<LoadedCh
 							if (a < PNG_ALPHA_THRESHOLD) {
 								row.push('');
 							} else {
-								row.push(`#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase());
+								row.push(rgbToHex(r, g, b));
 							}
 						}
 						sprite.push(row);

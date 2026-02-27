@@ -87,11 +87,8 @@ function isRecentlyActive(filePath: string): boolean {
 }
 
 /** 檢查 JSONL 檔案是否已被現有代理追蹤 */
-function isTrackedByAgent(filePath: string, agents: Map<number, AgentState>): boolean {
-	for (const agent of agents.values()) {
-		if (agent.jsonlFile === filePath) return true;
-	}
-	return false;
+function isTrackedByAgent(filePath: string, ctx: AgentContext): boolean {
+	return ctx.trackedJsonlFiles.has(filePath);
 }
 
 /** 啟動定期專案掃描，自動偵測並收養活躍的 Claude 會話 */
@@ -133,7 +130,7 @@ function scanAndAdopt(
 		knownJsonlFiles.add(file);
 
 		// 跳過已被代理追蹤的檔案
-		if (isTrackedByAgent(file, agents)) continue;
+		if (isTrackedByAgent(file, ctx)) continue;
 
 		// 僅收養最近活躍的檔案
 		if (!isRecentlyActive(file)) continue;
@@ -160,6 +157,7 @@ function scanAndAdopt(
 			isDetached: false,
 		};
 		agents.set(id, agent);
+		ctx.trackedJsonlFiles.set(file, id);
 		persistAgents();
 		console.log(`[Pixel Agents] Auto-adopted session: ${path.basename(file)} → Agent ${id}`);
 		sender?.postMessage({ type: 'agentCreated', id });
@@ -220,7 +218,9 @@ export function reassignAgentToFile(
 	cancelPermissionTimer(agentId, permissionTimers);
 	clearAgentActivity(agent, agentId, permissionTimers, sender);
 
+	ctx.trackedJsonlFiles.delete(agent.jsonlFile);
 	agent.jsonlFile = newFilePath;
+	ctx.trackedJsonlFiles.set(newFilePath, agentId);
 	agent.fileOffset = 0;
 	agent.lineBuffer = '';
 	persistAgents();

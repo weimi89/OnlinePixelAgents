@@ -1,4 +1,5 @@
 import type { SpriteData } from '../types.js'
+import { SPRITE_CACHE_MAX_ZOOM_LEVELS } from '../../constants.js'
 
 const zoomCaches = new Map<number, WeakMap<SpriteData, HTMLCanvasElement>>()
 
@@ -45,11 +46,21 @@ export function getOutlineSprite(sprite: SpriteData): SpriteData {
   return outline
 }
 
+/** 清除所有縮放快取 */
+export function clearSpriteCaches(): void {
+  zoomCaches.clear()
+}
+
 export function getCachedSprite(sprite: SpriteData, zoom: number): HTMLCanvasElement {
   let cache = zoomCaches.get(zoom)
   if (!cache) {
     cache = new WeakMap()
     zoomCaches.set(zoom, cache)
+    // 超過最大 zoom levels 時，刪除最舊的
+    if (zoomCaches.size > SPRITE_CACHE_MAX_ZOOM_LEVELS) {
+      const oldest = zoomCaches.keys().next().value!
+      zoomCaches.delete(oldest)
+    }
   }
 
   const cached = cache.get(sprite)

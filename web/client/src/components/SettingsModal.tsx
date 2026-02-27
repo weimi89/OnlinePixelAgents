@@ -79,12 +79,12 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
       try {
         const imported = JSON.parse(reader.result as string) as Record<string, unknown>
         if (imported.version !== 1 || !Array.isArray(imported.tiles)) {
-          console.error('Invalid layout file')
+          console.error(t.invalidLayoutFile)
           return
         }
         vscode.postMessage({ type: 'saveLayout', layout: imported })
       } catch {
-        console.error('Failed to parse layout file')
+        console.error(t.parseLayoutFailed)
       }
     }
     reader.readAsText(file)
@@ -118,6 +118,9 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
       />
       {/* 置中彈出視窗 */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t.settings}
         style={{
           position: 'fixed',
           top: '50%',
@@ -148,6 +151,7 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
             onClick={onClose}
             onMouseEnter={() => setHovered('close')}
             onMouseLeave={() => setHovered(null)}
+            aria-label={t.closeAgent}
             style={{
               background: hovered === 'close' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
               border: 'none',

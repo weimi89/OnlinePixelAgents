@@ -21,15 +21,15 @@ interface SessionPickerProps {
 
 function formatTimeAgo(ms: number): string {
   const seconds = Math.floor((Date.now() - ms) / 1000)
-  if (seconds < 60) return `${seconds} 秒前`
+  if (seconds < 60) return t.timeAgoSeconds(seconds)
   const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes} 分鐘前`
+  if (minutes < 60) return t.timeAgoMinutes(minutes)
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} 小時前`
+  if (hours < 24) return t.timeAgoHours(hours)
   const days = Math.floor(hours / 24)
-  if (days < 30) return `${days} 天前`
+  if (days < 30) return t.timeAgoDays(days)
   const months = Math.floor(days / 30)
-  return `${months} 個月前`
+  return t.timeAgoMonths(months)
 }
 
 function formatSize(bytes: number): string {
@@ -91,6 +91,9 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
       />
       {/* 彈出視窗 */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t.sessions}
         style={{
           position: 'fixed',
           top: '50%',
@@ -150,6 +153,7 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.searchSessions}
+              aria-label={t.searchSessions}
               autoFocus
               style={{
                 width: '100%',
@@ -193,8 +197,16 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
               return (
                 <div
                   key={key}
+                  role="listitem"
+                  tabIndex={session.isActive ? undefined : 0}
                   onMouseEnter={() => setHovered(key)}
                   onMouseLeave={() => setHovered(null)}
+                  onKeyDown={(e) => {
+                    if (!session.isActive && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault()
+                      onResume(session.sessionId, session.projectDir)
+                    }
+                  }}
                   style={{
                     padding: '8px 10px',
                     background: isHovered ? 'rgba(255, 255, 255, 0.06)' : 'transparent',

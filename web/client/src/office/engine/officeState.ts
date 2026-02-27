@@ -33,6 +33,9 @@ export class OfficeState {
   blockedTiles: Set<string>
   furniture: FurnitureInstance[]
   walkableTiles: Array<{ col: number; row: number }>
+  /** "col,row" → seatUid 快速查找索引 */
+  private seatTileIndex: Map<string, string> = new Map()
+  private furnitureDirty = true
   characters: Map<number, Character> = new Map()
   selectedAgentId: number | null = null
   cameraFollowId: number | null = null
@@ -48,9 +51,18 @@ export class OfficeState {
     this.layout = layout || createDefaultLayout()
     this.tileMap = layoutToTileMap(this.layout)
     this.seats = layoutToSeats(this.layout.furniture)
+    this.rebuildSeatTileIndex()
     this.blockedTiles = getBlockedTiles(this.layout.furniture)
     this.furniture = layoutToFurnitureInstances(this.layout.furniture)
     this.walkableTiles = getWalkableTiles(this.tileMap, this.blockedTiles)
+  }
+
+  /** 重建 seatTileIndex（"col,row" → seatUid） */
+  private rebuildSeatTileIndex(): void {
+    this.seatTileIndex.clear()
+    for (const [uid, seat] of this.seats) {
+      this.seatTileIndex.set(`${seat.seatCol},${seat.seatRow}`, uid)
+    }
   }
 
   /** 從新佈局重建所有衍生狀態。重新分配現有角色。
@@ -59,6 +71,7 @@ export class OfficeState {
     this.layout = layout
     this.tileMap = layoutToTileMap(layout)
     this.seats = layoutToSeats(layout.furniture)
+    this.rebuildSeatTileIndex()
     this.blockedTiles = getBlockedTiles(layout.furniture)
     this.rebuildFurnitureInstances()
     this.walkableTiles = getWalkableTiles(this.tileMap, this.blockedTiles)
@@ -264,10 +277,7 @@ export class OfficeState {
 
   /** 在指定格位置找到座位 uid，若無則回傳 null */
   getSeatAtTile(col: number, row: number): string | null {
-    for (const [uid, seat] of this.seats) {
-      if (seat.seatCol === col && seat.seatRow === row) return uid
-    }
-    return null
+    return this.seatTileIndex.get(`${col},${row}`) ?? null
   }
 
   /** 將代理從當前座位重新分配至新座位 */
@@ -516,12 +526,13 @@ export class OfficeState {
         ch.path = []
         ch.moveProgress = 0
       }
-      this.rebuildFurnitureInstances()
+      this.furnitureDirty = true
     }
   }
 
   /** 重建家具實例並套用自動狀態（活躍代理將電子設備切換為 ON） */
   private rebuildFurnitureInstances(): void {
+    this.furnitureDirty = false
     // 收集活躍代理面對書桌的格位
     const autoOnTiles = new Set<string>()
     for (const ch of this.characters.values()) {
@@ -625,6 +636,9 @@ export class OfficeState {
   }
 
   update(dt: number): void {
+    if (this.furnitureDirty) {
+      this.rebuildFurnitureInstances()
+    }
     const toDelete: number[] = []
     for (const ch of this.characters.values()) {
       // 處理 Matrix 特效動畫
@@ -668,14 +682,13 @@ export class OfficeState {
     return Array.from(this.characters.values())
   }
 
-  /** 取得指定像素位置的角色（用於點擊測試）。回傳 id 或 null。 */
+  /** 取得指定像素位置的角色（用於點擊測試）。回傳 id 或 null。
+   *  多個命中時回傳 y 值最大的（視覺上最前方的角色）。 */
   getCharacterAt(worldX: number, worldY: number): number | null {
-    const chars = this.getCharacters().sort((a, b) => b.y - a.y)
-    for (const ch of chars) {
-      // 跳過正在消散的角色
+    let bestId: number | null = null
+    let bestY = -Infinity
+    for (const ch of this.characters.values()) {
       if (ch.matrixEffect === 'despawn') continue
-      // 角色精靈圖為 16x24，錨點在底部中央
-      // 套用坐姿偏移以匹配視覺位置
       const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0
       const anchorY = ch.y + sittingOffset
       const left = ch.x - CHARACTER_HIT_HALF_WIDTH
@@ -683,9 +696,12 @@ export class OfficeState {
       const top = anchorY - CHARACTER_HIT_HEIGHT
       const bottom = anchorY
       if (worldX >= left && worldX <= right && worldY >= top && worldY <= bottom) {
-        return ch.id
+        if (ch.y > bestY) {
+          bestY = ch.y
+          bestId = ch.id
+        }
       }
     }
-    return null
+    return bestId
   }
 }

@@ -51,4 +51,6 @@ export interface AgentContext {
 	jsonlPollTimers: Map<number, ReturnType<typeof setInterval>>;
 	sender: MessageSender | undefined;
 	persistAgents: () => void;
+	/** filePath → agentId 快速查找，避免 isTrackedByAgent O(n) 遍歷 */
+	trackedJsonlFiles: Map<string, number>;
 }

@@ -112,3 +112,10 @@ export const CHARACTER_HIT_HEIGHT = 24
 export const TOOL_OVERLAY_VERTICAL_OFFSET = 32
 export const PULSE_ANIMATION_DURATION_SEC = 1.5
 export const DETACHED_CHARACTER_ALPHA = 0.45
+
+// ── 觸控 ────────────────────────────────────────────────────
+export const LONG_PRESS_DURATION_MS = 500
+
+// ── 快取限制 ────────────────────────────────────────────────
+export const COLORIZE_CACHE_MAX_SIZE = 256
+export const SPRITE_CACHE_MAX_ZOOM_LEVELS = 12

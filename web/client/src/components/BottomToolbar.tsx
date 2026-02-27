@@ -55,7 +55,7 @@ export function BottomToolbar({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   return (
-    <div style={panelStyle}>
+    <div role="toolbar" aria-label={t.layout} style={panelStyle}>
       <button
         onClick={onOpenClaude}
         onMouseEnter={() => setHovered('agent')}
@@ -89,6 +89,7 @@ export function BottomToolbar({
         onClick={onToggleEditMode}
         onMouseEnter={() => setHovered('edit')}
         onMouseLeave={() => setHovered(null)}
+        aria-pressed={isEditMode}
         style={
           isEditMode
             ? { ...btnActive }
@@ -106,6 +107,7 @@ export function BottomToolbar({
           onClick={() => setIsSettingsOpen((v) => !v)}
           onMouseEnter={() => setHovered('settings')}
           onMouseLeave={() => setHovered(null)}
+          aria-pressed={isSettingsOpen}
           style={
             isSettingsOpen
               ? { ...btnActive }

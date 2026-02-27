@@ -5,7 +5,7 @@ import type { EditorRenderState, SelectionRenderState, DeleteButtonBounds, Rotat
 import { startGameLoop } from '../engine/gameLoop.js'
 import { renderFrame } from '../engine/renderer.js'
 import { TILE_SIZE, EditTool } from '../types.js'
-import { CAMERA_FOLLOW_LERP, CAMERA_FOLLOW_SNAP_THRESHOLD, ZOOM_MIN, ZOOM_MAX, ZOOM_SCROLL_THRESHOLD, PAN_MARGIN_FRACTION } from '../../constants.js'
+import { CAMERA_FOLLOW_LERP, CAMERA_FOLLOW_SNAP_THRESHOLD, ZOOM_MIN, ZOOM_MAX, ZOOM_SCROLL_THRESHOLD, PAN_MARGIN_FRACTION, LONG_PRESS_DURATION_MS } from '../../constants.js'
 import { getCatalogEntry, isRotatable } from '../layout/furnitureCatalog.js'
 import { canPlaceFurniture, getWallPlacementRow } from '../editor/editorActions.js'
 import { vscode } from '../../socketApi.js'
@@ -45,6 +45,9 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
   const isEraseDraggingRef = useRef(false)
   // 縮放滾動累加器，用於觸控板縮放靈敏度
   const zoomAccumulatorRef = useRef(0)
+  // 觸控長按
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null)
 
   // 限制平移範圍，使地圖邊緣不會超出視窗內的邊距
   const clampPan = useCallback((px: number, py: number): { x: number; y: number } => {
@@ -666,6 +669,45 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
     if (e.button === 1) e.preventDefault()
   }, [])
 
+  // 觸控長按：500ms 後觸發 walkToTile（模擬右鍵行為）
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isEditMode || e.touches.length !== 1) return
+    const touch = e.touches[0]
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY }
+    longPressTimerRef.current = setTimeout(() => {
+      if (!touchStartPosRef.current) return
+      if (officeState.selectedAgentId !== null) {
+        const tile = screenToTile(touchStartPosRef.current.x, touchStartPosRef.current.y)
+        if (tile) {
+          officeState.walkToTile(officeState.selectedAgentId, tile.col, tile.row)
+        }
+      }
+      touchStartPosRef.current = null
+    }, LONG_PRESS_DURATION_MS)
+  }, [isEditMode, officeState, screenToTile])
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+    touchStartPosRef.current = null
+  }, [])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    // 手指移動超過 10px 取消長按
+    if (!touchStartPosRef.current || e.touches.length !== 1) {
+      handleTouchEnd()
+      return
+    }
+    const touch = e.touches[0]
+    const dx = touch.clientX - touchStartPosRef.current.x
+    const dy = touch.clientY - touchStartPosRef.current.y
+    if (dx * dx + dy * dy > 100) {
+      handleTouchEnd()
+    }
+  }, [handleTouchEnd])
+
   return (
     <div
       ref={containerRef}
@@ -687,6 +729,9 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
         onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
         onContextMenu={handleContextMenu}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchMove={handleTouchMove}
         style={{ display: 'block' }}
       />
     </div>

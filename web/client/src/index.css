@@ -68,3 +68,12 @@ html, body, #root {
 * {
   font-family: 'FS Pixel Sans', 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
 }
+
+@keyframes pixel-agents-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.pixel-agents-pulse {
+  animation: pixel-agents-pulse 1.5s ease-in-out infinite;
+}

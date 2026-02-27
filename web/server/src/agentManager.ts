@@ -203,6 +203,7 @@ function spawnClaudeAgent(
 	}
 
 	agents.set(id, agent);
+	ctx.trackedJsonlFiles.set(agent.jsonlFile, id);
 	activeAgentIdRef.current = id;
 	persistAgents();
 	console.log(`[Pixel Agents] Agent ${id}: ${label}`);
@@ -284,6 +285,7 @@ export function removeAgent(
 	cancelWaitingTimer(agentId, waitingTimers);
 	cancelPermissionTimer(agentId, permissionTimers);
 
+	ctx.trackedJsonlFiles.delete(agent.jsonlFile);
 	agents.delete(agentId);
 	persistAgents();
 }
@@ -374,6 +376,7 @@ export function recoverTmuxAgents(
 		// 從頭讀取以重建狀態
 		agent.fileOffset = 0;
 		agents.set(id, agent);
+		ctx.trackedJsonlFiles.set(agent.jsonlFile, id);
 
 		console.log(`[Pixel Agents] Recovered tmux agent ${id}: ${sessionName}`);
 		sender?.postMessage({ type: 'agentCreated', id });

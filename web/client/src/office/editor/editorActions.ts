@@ -4,6 +4,30 @@ import type { TileType as TileTypeVal, OfficeLayout, PlacedFurniture, FloorColor
 import { getCatalogEntry, getRotatedType, getToggledType } from '../layout/furnitureCatalog.js'
 import { getPlacementBlockedTiles } from '../layout/layoutSerializer.js'
 
+// deskTiles 模組級快取（避免每次 canPlaceFurniture 重建）
+let cachedDeskTiles: Set<string> | null = null
+let cachedDeskKey = ''
+
+function getDeskTiles(furniture: readonly PlacedFurniture[], excludeUid?: string): Set<string> {
+  // 簡易 cache key：家具數量 + excludeUid
+  const key = `${furniture.length}:${excludeUid ?? ''}`
+  if (key === cachedDeskKey && cachedDeskTiles) return cachedDeskTiles
+  const tiles = new Set<string>()
+  for (const item of furniture) {
+    if (item.uid === excludeUid) continue
+    const itemEntry = getCatalogEntry(item.type)
+    if (!itemEntry || !itemEntry.isDesk) continue
+    for (let dr = 0; dr < itemEntry.footprintH; dr++) {
+      for (let dc = 0; dc < itemEntry.footprintW; dc++) {
+        tiles.add(`${item.col + dc},${item.row + dr}`)
+      }
+    }
+  }
+  cachedDeskTiles = tiles
+  cachedDeskKey = key
+  return tiles
+}
+
 /** 以花紋和色彩繪製單一磚塊。返回新佈局（不可變）。 */
 export function paintTile(layout: OfficeLayout, col: number, row: number, tileType: TileTypeVal, color?: FloorColor): OfficeLayout {
   const idx = row * layout.cols + col
@@ -129,21 +153,8 @@ export function canPlaceFurniture(
   // 建構已佔據集合，排除正在移動的項目，跳過背景磚塊列
   const occupied = getPlacementBlockedTiles(layout.furniture, excludeUid)
 
-  // 若此項目可放在表面上，建構書桌磚塊集合以排除碰撞檢測
-  let deskTiles: Set<string> | null = null
-  if (entry.canPlaceOnSurfaces) {
-    deskTiles = new Set<string>()
-    for (const item of layout.furniture) {
-      if (item.uid === excludeUid) continue
-      const itemEntry = getCatalogEntry(item.type)
-      if (!itemEntry || !itemEntry.isDesk) continue
-      for (let dr = 0; dr < itemEntry.footprintH; dr++) {
-        for (let dc = 0; dc < itemEntry.footprintW; dc++) {
-          deskTiles.add(`${item.col + dc},${item.row + dr}`)
-        }
-      }
-    }
-  }
+  // 若此項目可放在表面上，取得書桌磚塊集合以排除碰撞檢測
+  const deskTiles = entry.canPlaceOnSurfaces ? getDeskTiles(layout.furniture, excludeUid) : null
 
   // 檢查重疊 — 也跳過新項目自身的背景列
   const newBgRows = entry.backgroundTiles || 0

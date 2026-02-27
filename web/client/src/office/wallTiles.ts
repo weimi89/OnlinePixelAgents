@@ -11,7 +11,7 @@
 
 import type { SpriteData, TileType as TileTypeVal, FloorColor, FurnitureInstance } from './types.js'
 import { TileType, TILE_SIZE } from './types.js'
-import { getColorizedSprite } from './colorize.js'
+import { getColorizedSprite, hslToHex } from './colorize.js'
 
 /** 以位元遮罩（0-15）索引的 16 個牆壁精靈圖 */
 let wallSprites: SpriteData[] | null = null
@@ -142,22 +142,5 @@ export function wallColorToHex(color: FloorColor): string {
 
   lightness = Math.max(0, Math.min(1, lightness))
 
-  // HSL 轉 hex（與 colorize.ts 的 hslToHex 相同）
-  const satFrac = s / 100
-  const ch = (1 - Math.abs(2 * lightness - 1)) * satFrac
-  const hp = h / 60
-  const x = ch * (1 - Math.abs(hp % 2 - 1))
-  let r1 = 0, g1 = 0, b1 = 0
-
-  if (hp < 1) { r1 = ch; g1 = x; b1 = 0 }
-  else if (hp < 2) { r1 = x; g1 = ch; b1 = 0 }
-  else if (hp < 3) { r1 = 0; g1 = ch; b1 = x }
-  else if (hp < 4) { r1 = 0; g1 = x; b1 = ch }
-  else if (hp < 5) { r1 = x; g1 = 0; b1 = ch }
-  else { r1 = ch; g1 = 0; b1 = x }
-
-  const m = lightness - ch / 2
-  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round((v + m) * 255)))
-
-  return `#${clamp(r1).toString(16).padStart(2, '0')}${clamp(g1).toString(16).padStart(2, '0')}${clamp(b1).toString(16).padStart(2, '0')}`
+  return hslToHex(h, s / 100, lightness)
 }

@@ -198,7 +198,9 @@ function handleAgentToolStart(msg: ServerMessage & { type: 'agentToolStart' }, c
     const subId = ctx.os.addSubagent(id, toolId)
     ctx.setSubagentCharacters((prev) => {
       if (prev.some((s) => s.id === subId)) return prev
-      return [...prev, { id: subId, parentAgentId: id, parentToolId: toolId, label }]
+      const siblingCount = prev.filter((s) => s.parentAgentId === id).length
+      const numbered = `#${siblingCount + 1} ${label}`
+      return [...prev, { id: subId, parentAgentId: id, parentToolId: toolId, label: numbered }]
     })
   }
 }

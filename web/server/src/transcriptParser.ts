@@ -35,7 +35,9 @@ export function formatToolStatus(toolName: string, input: Record<string, unknown
 		case 'WebSearch': return 'Searching the web';
 		case 'Task': {
 			const desc = typeof input.description === 'string' ? input.description : '';
-			return desc ? `Subtask: ${desc.length > TASK_DESCRIPTION_DISPLAY_MAX_LENGTH ? desc.slice(0, TASK_DESCRIPTION_DISPLAY_MAX_LENGTH) + '\u2026' : desc}` : 'Running subtask';
+			const agentType = typeof input.subagent_type === 'string' ? input.subagent_type : '';
+			const typeTag = agentType ? `[${agentType}] ` : '';
+			return desc ? `Subtask: ${typeTag}${desc.length > TASK_DESCRIPTION_DISPLAY_MAX_LENGTH ? desc.slice(0, TASK_DESCRIPTION_DISPLAY_MAX_LENGTH) + '\u2026' : desc}` : 'Running subtask';
 		}
 		case 'AskUserQuestion': return 'Waiting for your answer';
 		case 'EnterPlanMode': return 'Planning';

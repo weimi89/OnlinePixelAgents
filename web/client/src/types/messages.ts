@@ -13,6 +13,8 @@ interface AgentMeta {
   palette?: number
   hueShift?: number
   seatId?: string
+  isExternal?: boolean
+  projectName?: string
 }
 
 /** 角色精靈圖方向資料 */
@@ -25,7 +27,7 @@ interface CharacterSpriteDirections {
 /** 伺服器 → 客戶端訊息的 discriminated union */
 export type ServerMessage =
   | { type: 'layoutLoaded'; layout: OfficeLayout | null }
-  | { type: 'agentCreated'; id: number }
+  | { type: 'agentCreated'; id: number; isExternal?: boolean; projectName?: string }
   | { type: 'agentClosed'; id: number }
   | { type: 'existingAgents'; agents: number[]; agentMeta?: Record<number, AgentMeta> }
   | { type: 'agentToolStart'; id: number; toolId: string; status: string }

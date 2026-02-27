@@ -3,8 +3,8 @@ import * as path from 'path';
 import type { AgentContext, AgentState } from './types.js';
 import { cancelWaitingTimer, cancelPermissionTimer, clearAgentActivity } from './timerManager.js';
 import { processTranscriptLine } from './transcriptParser.js';
-import { removeAgent } from './agentManager.js';
-import { FILE_WATCHER_POLL_INTERVAL_MS, PROJECT_SCAN_INTERVAL_MS, ACTIVE_JSONL_MAX_AGE_MS } from './constants.js';
+import { removeAgent, extractProjectName } from './agentManager.js';
+import { FILE_WATCHER_POLL_INTERVAL_MS, PROJECT_SCAN_INTERVAL_MS, ACTIVE_JSONL_MAX_AGE_MS, STALE_AGENT_TIMEOUT_MS } from './constants.js';
 
 /** 啟動檔案監視（fs.watch + 輪詢備援），偵測 JSONL 檔案變更 */
 export function startFileWatching(
@@ -160,7 +160,12 @@ function scanAndAdopt(
 		ctx.trackedJsonlFiles.set(file, id);
 		persistAgents();
 		console.log(`[Pixel Agents] Auto-adopted session: ${path.basename(file)} → Agent ${id}`);
-		sender?.postMessage({ type: 'agentCreated', id });
+		const isExternal = projectDir !== ctx.ownProjectDir;
+		sender?.postMessage({
+			type: 'agentCreated',
+			id,
+			...(isExternal ? { isExternal: true, projectName: extractProjectName(projectDir) } : {}),
+		});
 
 		// 立即開始監視檔案
 		startFileWatching(id, file, ctx);
@@ -182,8 +187,8 @@ function checkStaleAgents(ctx: AgentContext): void {
 		try {
 			const stat = fs.statSync(agent.jsonlFile);
 			const age = Date.now() - stat.mtimeMs;
-			// 如果檔案超過 2 倍閾值未被存取，視為過期
-			if (age > ACTIVE_JSONL_MAX_AGE_MS * 2) {
+			// 使用較長的過期閾值（10 分鐘），容忍 extended thinking 等長時間無寫入的情況
+			if (age > STALE_AGENT_TIMEOUT_MS) {
 				console.log(`[Pixel Agents] Agent ${id}: session stale (${Math.round(age / 1000)}s), removing`);
 				staleIds.push(id);
 			}

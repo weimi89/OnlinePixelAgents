@@ -46,6 +46,8 @@ export interface ExtensionMessageState {
   subagentCharacters: SubagentCharacter[]
   layoutReady: boolean
   loadedAssets?: { catalog: FurnitureAsset[]; sprites: Record<string, string[][]> }
+  /** agentId → projectName，僅外部專案代理有條目 */
+  agentProjects: Record<number, string>
 }
 
 function saveAgentSeats(os: OfficeState): void {
@@ -71,6 +73,7 @@ export function useExtensionMessages(
   const [subagentCharacters, setSubagentCharacters] = useState<SubagentCharacter[]>([])
   const [layoutReady, setLayoutReady] = useState(false)
   const [loadedAssets, setLoadedAssets] = useState<{ catalog: FurnitureAsset[]; sprites: Record<string, string[][]> } | undefined>()
+  const [agentProjects, setAgentProjects] = useState<Record<number, string>>({})
 
   const layoutReadyRef = useRef(false)
   const pendingAgentsRef = useRef<Array<{ id: number; palette?: number; hueShift?: number; seatId?: string }>>([])
@@ -103,9 +106,12 @@ export function useExtensionMessages(
           saveAgentSeats(os)
         }
       } else if (msg.type === 'agentCreated') {
-        const { id } = msg
+        const { id, isExternal, projectName } = msg
         setAgents((prev) => (prev.includes(id) ? prev : [...prev, id]))
         setSelectedAgent(id)
+        if (isExternal && projectName) {
+          setAgentProjects((prev) => ({ ...prev, [id]: projectName }))
+        }
         os.addAgent(id)
         saveAgentSeats(os)
       } else if (msg.type === 'agentClosed') {
@@ -130,6 +136,12 @@ export function useExtensionMessages(
           delete next[id]
           return next
         })
+        setAgentProjects((prev) => {
+          if (!(id in prev)) return prev
+          const next = { ...prev }
+          delete next[id]
+          return next
+        })
         setSubagentTools((prev) => {
           if (!(id in prev)) return prev
           const next = { ...prev }
@@ -141,14 +153,21 @@ export function useExtensionMessages(
         os.removeAgent(id)
       } else if (msg.type === 'existingAgents') {
         const incoming = msg.agents
-        const meta = msg.agentMeta || ({} as Record<number, { palette?: number; hueShift?: number; seatId?: string }>)
+        const meta = msg.agentMeta || ({} as Record<number, { palette?: number; hueShift?: number; seatId?: string; isExternal?: boolean; projectName?: string }>)
+        const newProjects: Record<number, string> = {}
         for (const id of incoming) {
           const m = meta[id]
+          if (m?.isExternal && m.projectName) {
+            newProjects[id] = m.projectName
+          }
           if (layoutReadyRef.current) {
             os.addAgent(id, m?.palette, m?.hueShift, m?.seatId, true)
           } else {
             pendingAgentsRef.current.push({ id, palette: m?.palette, hueShift: m?.hueShift, seatId: m?.seatId })
           }
+        }
+        if (Object.keys(newProjects).length > 0) {
+          setAgentProjects((prev) => ({ ...prev, ...newProjects }))
         }
         if (layoutReadyRef.current && incoming.length > 0) {
           saveAgentSeats(os)
@@ -346,5 +365,5 @@ export function useExtensionMessages(
     return unsub
   }, [getOfficeState])
 
-  return { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets }
+  return { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects }
 }

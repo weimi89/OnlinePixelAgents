@@ -25,6 +25,13 @@ const CLAUDE_BIN = (() => {
 	}
 })();
 
+/** 從專案目錄名稱提取可讀的專案名稱（取最後一段非空片段） */
+export function extractProjectName(projectDir: string): string {
+	const dirName = path.basename(projectDir);
+	const parts = dirName.split(/-+/).filter(Boolean);
+	return parts[parts.length - 1] || dirName;
+}
+
 /** 從工作目錄路徑推導出 Claude 專案目錄路徑 */
 export function getProjectDirPath(cwd: string): string {
 	const dirName = cwd.replace(/[^a-zA-Z0-9-]/g, '-');
@@ -207,7 +214,12 @@ function spawnClaudeAgent(
 	activeAgentIdRef.current = id;
 	persistAgents();
 	console.log(`[Pixel Agents] Agent ${id}: ${label}`);
-	sender?.postMessage({ type: 'agentCreated', id });
+	const isExternal = projectDir !== ctx.ownProjectDir;
+	sender?.postMessage({
+		type: 'agentCreated',
+		id,
+		...(isExternal ? { isExternal: true, projectName: extractProjectName(projectDir) } : {}),
+	});
 
 	// 輪詢等待 JSONL 檔案出現後開始檔案監視
 	const pollTimer = setInterval(() => {
@@ -379,7 +391,12 @@ export function recoverTmuxAgents(
 		ctx.trackedJsonlFiles.set(agent.jsonlFile, id);
 
 		console.log(`[Pixel Agents] Recovered tmux agent ${id}: ${sessionName}`);
-		sender?.postMessage({ type: 'agentCreated', id });
+		const isExternal = projectDir !== ctx.ownProjectDir;
+		sender?.postMessage({
+			type: 'agentCreated',
+			id,
+			...(isExternal ? { isExternal: true, projectName: extractProjectName(projectDir) } : {}),
+		});
 
 		// 啟動檔案監視
 		startFileWatching(id, jsonlFile, ctx);
@@ -419,6 +436,7 @@ export function sendExistingAgents(
 	agents: Map<number, AgentState>,
 	agentMeta: Record<string, { palette?: number; hueShift?: number; seatId?: string }>,
 	sender: MessageSender | undefined,
+	ownProjectDir: string,
 ): void {
 	if (!sender) return;
 	const agentIds: number[] = [];
@@ -427,10 +445,25 @@ export function sendExistingAgents(
 	}
 	agentIds.sort((a, b) => a - b);
 
+	// 為每個代理補充外部專案資訊
+	const enrichedMeta: Record<string, { palette?: number; hueShift?: number; seatId?: string; isExternal?: boolean; projectName?: string }> = {};
+	for (const [idStr, meta] of Object.entries(agentMeta)) {
+		enrichedMeta[idStr] = { ...meta };
+	}
+	for (const [id, agent] of agents) {
+		const isExternal = agent.projectDir !== ownProjectDir;
+		if (isExternal) {
+			const key = String(id);
+			if (!enrichedMeta[key]) enrichedMeta[key] = {};
+			enrichedMeta[key].isExternal = true;
+			enrichedMeta[key].projectName = extractProjectName(agent.projectDir);
+		}
+	}
+
 	sender.postMessage({
 		type: 'existingAgents',
 		agents: agentIds,
-		agentMeta,
+		agentMeta: enrichedMeta,
 	});
 
 	// 重新傳送當前狀態

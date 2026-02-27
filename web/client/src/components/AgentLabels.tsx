@@ -14,6 +14,8 @@ interface AgentLabelsProps {
   zoom: number
   panRef: React.RefObject<{ x: number; y: number }>
   subagentCharacters: SubagentCharacter[]
+  /** agentId → projectName，僅外部專案代理有條目 */
+  agentProjects: Record<number, string>
 }
 
 export function AgentLabels({
@@ -25,6 +27,7 @@ export function AgentLabels({
   zoom,
   panRef,
   subagentCharacters,
+  agentProjects,
 }: AgentLabelsProps) {
   useRenderTick()
 
@@ -81,9 +84,12 @@ export function AgentLabels({
         }
 
         const modelDisplay = agentModels[id] ? formatModelName(agentModels[id]) : null
+        const projectName = agentProjects[id]
         const labelText = isDetached
           ? t.detached
-          : (subLabelMap.get(id) || (modelDisplay ? `${modelDisplay}` : t.agent(id)))
+          : projectName
+            ? projectName
+            : (subLabelMap.get(id) || (modelDisplay ? `${modelDisplay}` : t.agent(id)))
 
         return (
           <div

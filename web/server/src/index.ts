@@ -18,7 +18,7 @@ import {
 } from './assetLoader.js';
 import type { LoadedAssets, LoadedFloorTiles, LoadedWallTiles, LoadedCharacterSprites } from './assetLoader.js';
 import { writeLayoutToFile, loadLayout } from './layoutPersistence.js';
-import { launchNewAgent, closeAgent, sendExistingAgents, getAllProjectDirs, resumeSession, recoverTmuxAgents, checkTmuxHealth, savePersistedAgents } from './agentManager.js';
+import { launchNewAgent, closeAgent, sendExistingAgents, getAllProjectDirs, getProjectDirPath, resumeSession, recoverTmuxAgents, checkTmuxHealth, savePersistedAgents } from './agentManager.js';
 import { scanAllSessions } from './sessionScanner.js';
 import { ensureProjectScan } from './fileWatcher.js';
 import {
@@ -90,6 +90,23 @@ function persistAgents(): void {
 	savePersistedAgents(agents);
 }
 
+// ── 決定工作目錄 ──────────────────────────────────────────
+
+function findGitRoot(startDir: string): string | null {
+	let dir = startDir;
+	while (true) {
+		if (fs.existsSync(path.join(dir, '.git'))) return dir;
+		const parent = path.dirname(dir);
+		if (parent === dir) return null;
+		dir = parent;
+	}
+}
+
+const cwd = process.argv[2] || findGitRoot(process.cwd()) || process.cwd();
+const ownProjectDir = getProjectDirPath(cwd);
+console.log(`[Pixel Agents] Working directory: ${cwd}`);
+console.log(`[Pixel Agents] Own project dir: ${ownProjectDir}`);
+
 // ── AgentContext — 集中管理的共享狀態 ──────────────────────
 
 /** 暫時的 sender 佔位 — 在 socket 連線時更新 */
@@ -106,6 +123,7 @@ const ctx: AgentContext = {
 	sender: undefined,
 	persistAgents,
 	trackedJsonlFiles: new Map(),
+	ownProjectDir,
 };
 
 // ── tmux 健康檢查 ───────────────────────────────────────
@@ -118,21 +136,6 @@ function startTmuxHealthCheck(): void {
 		checkTmuxHealth(ctx);
 	}, TMUX_HEALTH_CHECK_INTERVAL_MS);
 }
-
-// ── 決定工作目錄 ──────────────────────────────────────────
-
-function findGitRoot(startDir: string): string | null {
-	let dir = startDir;
-	while (true) {
-		if (fs.existsSync(path.join(dir, '.git'))) return dir;
-		const parent = path.dirname(dir);
-		if (parent === dir) return null;
-		dir = parent;
-	}
-}
-
-const cwd = process.argv[2] || findGitRoot(process.cwd()) || process.cwd();
-console.log(`[Pixel Agents] Working directory: ${cwd}`);
 
 // ── 解析素材根目錄 ──────────────────────────────────────
 
@@ -267,7 +270,7 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 			const agentMeta = readJsonFile<Record<string, { palette?: number; hueShift?: number; seatId?: string }>>(
 				getAgentSeatsPath(), {},
 			);
-			sendExistingAgents(agents, agentMeta, sender);
+			sendExistingAgents(agents, agentMeta, sender, ownProjectDir);
 
 			// 演示模式或真實的自動偵測
 			if (isDemoEnabled()) {
@@ -280,7 +283,7 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 					recoverTmuxAgents(ctx);
 				}
 				// 恢復後重新傳送現有代理（包含已恢復的 tmux 代理）
-				sendExistingAgents(agents, agentMeta, sender);
+				sendExistingAgents(agents, agentMeta, sender, ownProjectDir);
 
 				// 啟動專案掃描 — 自動偵測所有專案中正在執行的 Claude 會話
 				const projectDirs = getAllProjectDirs();

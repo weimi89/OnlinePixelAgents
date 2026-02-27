@@ -125,7 +125,7 @@ function App() {
 
   const isEditDirty = useCallback(() => editor.isEditMode && editor.isDirty, [editor.isEditMode, editor.isDirty])
 
-  const { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
+  const { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
 
   const [isDebugMode, setIsDebugMode] = useState(false)
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false)
@@ -361,6 +361,7 @@ function App() {
         zoom={editor.zoom}
         panRef={editor.panRef}
         subagentCharacters={subagentCharacters}
+        agentProjects={agentProjects}
       />
 
       <ToolOverlay

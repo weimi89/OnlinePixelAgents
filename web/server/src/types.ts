@@ -53,4 +53,6 @@ export interface AgentContext {
 	persistAgents: () => void;
 	/** filePath → agentId 快速查找，避免 isTrackedByAgent O(n) 遍歷 */
 	trackedJsonlFiles: Map<string, number>;
+	/** 本伺服器工作目錄對應的 Claude 專案目錄，用於區分本專案 vs 外部代理 */
+	ownProjectDir: string;
 }

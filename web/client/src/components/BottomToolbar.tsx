@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { SettingsModal } from './SettingsModal.js'
 import { t } from '../i18n.js'
 
@@ -43,7 +43,7 @@ const btnActive: React.CSSProperties = {
 }
 
 
-export function BottomToolbar({
+export const BottomToolbar = memo(function BottomToolbar({
   isEditMode,
   onOpenClaude,
   onToggleEditMode,
@@ -129,4 +129,4 @@ export function BottomToolbar({
       </div>
     </div>
   )
-}
+})

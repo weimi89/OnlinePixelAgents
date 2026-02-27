@@ -1,9 +1,10 @@
 import type { ToolActivity } from '../types.js'
 import type { OfficeState } from '../engine/officeState.js'
-import type { SubagentCharacter } from '../../hooks/useExtensionMessages.js'
+import type { SubagentCharacter, TranscriptEntry } from '../../hooks/useExtensionMessages.js'
 import { TILE_SIZE } from '../types.js'
+import { extractToolName } from '../toolUtils.js'
 import { isSittingState } from '../engine/characters.js'
-import { TOOL_OVERLAY_VERTICAL_OFFSET, CHARACTER_SITTING_OFFSET_PX } from '../../constants.js'
+import { TOOL_OVERLAY_VERTICAL_OFFSET, CHARACTER_SITTING_OFFSET_PX, TOOL_TYPE_COLORS } from '../../constants.js'
 import { t } from '../../i18n.js'
 import { useRenderTick } from '../../hooks/useRenderTick.js'
 import { formatModelName } from '../../utils.js'
@@ -20,6 +21,8 @@ interface ToolOverlayProps {
   onCloseAgent: (id: number) => void
   /** agentId → projectName，僅外部專案代理有條目 */
   agentProjects: Record<number, string>
+  /** agentId → 轉錄記錄陣列 */
+  agentTranscripts: Record<number, TranscriptEntry[]>
 }
 
 /** 格式化秒數為人類可讀字串 */
@@ -61,6 +64,27 @@ function getActivityText(
   return t.idle
 }
 
+/** 格式化時間戳為 HH:MM:SS */
+function formatTime(ts: number): string {
+  const d = new Date(ts)
+  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
+const TRANSCRIPT_ROLE_COLORS: Record<string, string> = {
+  assistant: 'var(--pixel-tool-task)',
+  user: 'var(--pixel-tool-read)',
+  system: 'var(--pixel-status-permission)',
+}
+
+/** 根據活躍工具類型決定狀態圓點顏色 */
+function getToolColor(tools: ToolActivity[] | undefined): string {
+  if (!tools) return 'var(--pixel-status-active)'
+  const active = [...tools].reverse().find((t) => !t.done)
+  if (!active) return 'var(--pixel-status-active)'
+  const toolName = extractToolName(active.status)
+  return (toolName && TOOL_TYPE_COLORS[toolName]) || 'var(--pixel-status-active)'
+}
+
 /** 取得最近完成的工具歷史（最多 3 個） */
 function getRecentHistory(agentId: number, agentTools: Record<number, ToolActivity[]>): Array<{ status: string; duration: string }> {
   const tools = agentTools[agentId]
@@ -83,6 +107,7 @@ export function ToolOverlay({
   panRef,
   onCloseAgent,
   agentProjects,
+  agentTranscripts,
 }: ToolOverlayProps) {
   useRenderTick()
 
@@ -142,6 +167,9 @@ export function ToolOverlay({
         // 取得最近完成的工具歷史（僅選取時顯示）
         const history = isSelected && !isSub ? getRecentHistory(id, agentTools) : []
 
+        // 取得轉錄記錄（僅選取時顯示，最近 8 條）
+        const transcript = isSelected && !isSub ? (agentTranscripts[id] || []).slice(-8) : []
+
         // 取得模型顯示名稱與代理標籤
         const modelName = !isSub && agentModels[id] ? formatModelName(agentModels[id]) : null
         const projectName = !isSub ? agentProjects[id] : undefined
@@ -159,7 +187,7 @@ export function ToolOverlay({
         } else if (hasPermission) {
           dotColor = 'var(--pixel-status-permission)'
         } else if (isActive && hasActiveTools) {
-          dotColor = 'var(--pixel-status-active)'
+          dotColor = getToolColor(tools)
         }
 
         return (
@@ -276,6 +304,30 @@ export function ToolOverlay({
                     >
                       {h.status} ({h.duration})
                     </span>
+                  ))}
+                </div>
+              )}
+              {/* 轉錄記錄（僅選取時顯示） */}
+              {transcript.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--pixel-border)', marginTop: 2, paddingTop: 2, maxHeight: 120, overflowY: 'auto' }}>
+                  {transcript.map((entry, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: 'flex',
+                        gap: 4,
+                        fontSize: '14px',
+                        lineHeight: '16px',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <span style={{ color: 'var(--pixel-text-dim)', opacity: 0.5, flexShrink: 0 }}>
+                        {formatTime(entry.ts)}
+                      </span>
+                      <span style={{ color: TRANSCRIPT_ROLE_COLORS[entry.role] || 'var(--pixel-text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {entry.summary}
+                      </span>
+                    </div>
                   ))}
                 </div>
               )}

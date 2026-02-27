@@ -5,7 +5,7 @@
  */
 
 import type { OfficeLayout } from '../office/types.js'
-import type { FurnitureAsset } from '../hooks/useExtensionMessages.js'
+import type { FurnitureAsset, TranscriptEntry } from '../hooks/useExtensionMessages.js'
 import type { SessionInfo } from '../components/SessionPicker.js'
 
 /** 代理元資料（恢復既有代理時附帶） */
@@ -51,4 +51,5 @@ export type ServerMessage =
   | { type: 'settingsLoaded'; soundEnabled: boolean }
   | { type: 'sessionsList'; sessions: SessionInfo[] }
   | { type: 'agentEmote'; id: number; emote: string }
+  | { type: 'agentTranscript'; id: number; log: TranscriptEntry[] }
   | { type: 'exportLayoutData'; layout: OfficeLayout }

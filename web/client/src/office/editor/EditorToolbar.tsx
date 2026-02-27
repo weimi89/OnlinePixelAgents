@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { EditTool } from '../types.js'
 import type { TileType as TileTypeVal, FloorColor } from '../types.js'
 import { getCatalogByCategory, buildDynamicCatalog, getActiveCategories } from '../layout/furnitureCatalog.js'
@@ -140,7 +140,7 @@ function ColorSlider({ label, value, min, max, onChange }: {
 
 const DEFAULT_FURNITURE_COLOR: FloorColor = { h: 0, s: 0, b: 0, c: 0 }
 
-export function EditorToolbar({
+export const EditorToolbar = memo(function EditorToolbar({
   activeTool,
   selectedTileType,
   selectedFurnitureType,
@@ -480,4 +480,4 @@ export function EditorToolbar({
       )}
     </div>
   )
-}
+})

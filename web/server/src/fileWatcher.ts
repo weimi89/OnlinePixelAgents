@@ -155,6 +155,7 @@ function scanAndAdopt(
 			model: null,
 			tmuxSessionName: null,
 			isDetached: false,
+			transcriptLog: [],
 		};
 		agents.set(id, agent);
 		ctx.trackedJsonlFiles.set(file, id);

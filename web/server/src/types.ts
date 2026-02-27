@@ -25,6 +25,8 @@ export interface AgentState {
 	tmuxSessionName: string | null;
 	/** 此代理的 tmux 會話是否存活但伺服器剛重啟（尚未重新連接） */
 	isDetached: boolean;
+	/** 最近的精簡轉錄記錄（FIFO，最多 MAX_TRANSCRIPT_LOG 條） */
+	transcriptLog: Array<{ ts: number; role: 'user' | 'assistant' | 'system'; summary: string }>;
 }
 
 export interface PersistedAgent {

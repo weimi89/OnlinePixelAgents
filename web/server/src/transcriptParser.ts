@@ -12,6 +12,7 @@ import {
 	TEXT_IDLE_DELAY_MS,
 	BASH_COMMAND_DISPLAY_MAX_LENGTH,
 	TASK_DESCRIPTION_DISPLAY_MAX_LENGTH,
+	MAX_TRANSCRIPT_LOG,
 } from './constants.js';
 
 /** 工具權限豁免清單 — 這些工具不會觸發權限等待偵測 */
@@ -41,6 +42,22 @@ export function formatToolStatus(toolName: string, input: Record<string, unknown
 		case 'NotebookEdit': return `Editing notebook`;
 		default: return `Using ${toolName}`;
 	}
+}
+
+/** 追加一筆精簡轉錄記錄到代理的 transcriptLog，並推送至客戶端 */
+function appendTranscript(
+	agentId: number,
+	agent: { transcriptLog: Array<{ ts: number; role: 'user' | 'assistant' | 'system'; summary: string }> },
+	role: 'user' | 'assistant' | 'system',
+	summary: string,
+	sender: import('./types.js').MessageSender | undefined,
+): void {
+	const entry = { ts: Date.now(), role, summary };
+	agent.transcriptLog.push(entry);
+	if (agent.transcriptLog.length > MAX_TRANSCRIPT_LOG) {
+		agent.transcriptLog.splice(0, agent.transcriptLog.length - MAX_TRANSCRIPT_LOG);
+	}
+	sender?.postMessage({ type: 'agentTranscript', id: agentId, log: agent.transcriptLog });
 }
 
 /** 解析單行 JSONL 轉錄記錄，更新代理狀態並發送對應訊息 */
@@ -111,8 +128,14 @@ export function processTranscriptLine(
 				if (hasNonExemptTool) {
 					startPermissionTimer(agentId, agents, permissionTimers, PERMISSION_EXEMPT_TOOLS, sender);
 				}
+				// 轉錄：記錄工具呼叫
+				const lastStatus = agent.activeToolStatuses.size > 0 ? [...agent.activeToolStatuses.values()].pop()! : 'Using tools';
+				appendTranscript(agentId, agent, 'assistant', lastStatus, sender);
+			} else if (hasThinking) {
+				appendTranscript(agentId, agent, 'assistant', '[thinking]', sender);
 			} else if (blocks.some(b => b.type === 'text') && !agent.hadToolsInTurn) {
 				startWaitingTimer(agentId, TEXT_IDLE_DELAY_MS, agents, waitingTimers, sender);
+				appendTranscript(agentId, agent, 'assistant', 'Responding...', sender);
 			}
 		} else if (record.type === 'progress') {
 			processProgressRecord(agentId, record, ctx);
@@ -151,6 +174,7 @@ export function processTranscriptLine(
 					if (agent.activeToolIds.size === 0) {
 						agent.hadToolsInTurn = false;
 					}
+					appendTranscript(agentId, agent, 'user', `Result: ${blocks.filter(b => b.type === 'tool_result').map(b => (b.tool_use_id || '').slice(0, 8)).join(', ')}`, sender);
 				} else {
 					cancelWaitingTimer(agentId, waitingTimers);
 					clearAgentActivity(agent, agentId, permissionTimers, sender);
@@ -160,9 +184,12 @@ export function processTranscriptLine(
 				cancelWaitingTimer(agentId, waitingTimers);
 				clearAgentActivity(agent, agentId, permissionTimers, sender);
 				agent.hadToolsInTurn = false;
+				const trimmed = content.trim();
+				appendTranscript(agentId, agent, 'user', trimmed.length > 60 ? trimmed.slice(0, 60) + '\u2026' : trimmed, sender);
 			}
 		} else if (record.type === 'system' && record.subtype === 'compact_boundary') {
 			sender?.postMessage({ type: 'agentEmote', id: agentId, emote: 'compress' });
+			appendTranscript(agentId, agent, 'system', 'Context compacted', sender);
 		} else if (record.type === 'system' && record.subtype === 'turn_duration') {
 			cancelWaitingTimer(agentId, waitingTimers);
 			cancelPermissionTimer(agentId, permissionTimers);
@@ -186,6 +213,7 @@ export function processTranscriptLine(
 				id: agentId,
 				status: 'waiting',
 			});
+			appendTranscript(agentId, agent, 'system', 'Turn complete', sender);
 		}
 	} catch {
 		// 忽略格式錯誤的行

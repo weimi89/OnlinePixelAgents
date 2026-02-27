@@ -51,6 +51,13 @@
   --pixel-status-active: #3794ff;
   --pixel-status-detached: #888;
 
+  /* Tool type colors */
+  --pixel-tool-read: #5ca3ff;
+  --pixel-tool-write: #ff6b6b;
+  --pixel-tool-execute: #5ac88c;
+  --pixel-tool-task: #c78cff;
+  --pixel-tool-wait: #cca700;
+
   /* ToolOverlay z-index layers */
   --pixel-overlay-z: 100;
   --pixel-overlay-selected-z: 110;

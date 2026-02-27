@@ -140,6 +140,22 @@ export const WANDER_WEIGHT_RETURN_SEAT = 5
 export const WANDER_RANDOM_RADIUS = 3             // 隨機漫遊最大格數
 export const WANDER_MAX_PATH_STEPS = 5            // 路徑最長步數（截斷）
 
+// ── 工具類型顏色映射 ──────────────────────────────────────────
+export const TOOL_TYPE_COLORS: Record<string, string> = {
+  Read: 'var(--pixel-tool-read)',
+  Grep: 'var(--pixel-tool-read)',
+  Glob: 'var(--pixel-tool-read)',
+  WebFetch: 'var(--pixel-tool-read)',
+  WebSearch: 'var(--pixel-tool-read)',
+  Edit: 'var(--pixel-tool-write)',
+  Write: 'var(--pixel-tool-write)',
+  NotebookEdit: 'var(--pixel-tool-write)',
+  Bash: 'var(--pixel-tool-execute)',
+  Task: 'var(--pixel-tool-task)',
+  AskUserQuestion: 'var(--pixel-tool-wait)',
+  EnterPlanMode: 'var(--pixel-tool-wait)',
+}
+
 // ── 觸控 ────────────────────────────────────────────────────
 export const LONG_PRESS_DURATION_MS = 500
 

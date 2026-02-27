@@ -46,6 +46,9 @@ export const MAX_SESSIONS_DISPLAY = 50;
 // ── tmux ─────────────────────────────────────────────────────
 export const TMUX_HEALTH_CHECK_INTERVAL_MS = 5000;
 
+// ── 轉錄記錄 ──────────────────────────────────────────────
+export const MAX_TRANSCRIPT_LOG = 15;
+
 // ── 伺服器 ──────────────────────────────────────────────────
 export const DEFAULT_PORT = 3000;
 export const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 5000; // 強制退出前的寬限時間

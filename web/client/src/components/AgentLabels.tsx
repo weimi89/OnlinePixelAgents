@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { OfficeState } from '../office/engine/officeState.js'
 import type { SubagentCharacter } from '../hooks/useExtensionMessages.js'
 import { TILE_SIZE } from '../office/types.js'
@@ -14,7 +15,7 @@ interface AgentLabelsProps {
   subagentCharacters: SubagentCharacter[]
 }
 
-export function AgentLabels({
+export const AgentLabels = memo(function AgentLabels({
   officeState,
   agents,
   agentStatuses,
@@ -107,4 +108,4 @@ export function AgentLabels({
       })}
     </>
   )
-}
+})

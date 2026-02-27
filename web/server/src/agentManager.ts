@@ -144,6 +144,7 @@ function createAgentState(
 		model: null,
 		tmuxSessionName: tmuxName,
 		isDetached,
+		transcriptLog: [],
 	};
 }
 

@@ -56,6 +56,15 @@ export interface ExtensionMessageState {
   loadedAssets?: { catalog: FurnitureAsset[]; sprites: Record<string, string[][]> }
   /** agentId → projectName，僅外部專案代理有條目 */
   agentProjects: Record<number, string>
+  /** agentId → 轉錄記錄陣列 */
+  agentTranscripts: Record<number, TranscriptEntry[]>
+}
+
+/** 轉錄記錄條目 */
+export interface TranscriptEntry {
+  ts: number
+  role: 'user' | 'assistant' | 'system'
+  summary: string
 }
 
 function saveAgentSeats(os: OfficeState): void {
@@ -66,6 +75,350 @@ function saveAgentSeats(os: OfficeState): void {
   }
   vscode.postMessage({ type: 'saveAgentSeats', seats })
 }
+
+// ── Handler Context ────────────────────────────────────────────
+
+interface HandlerContext {
+  os: OfficeState
+  layoutReadyRef: React.MutableRefObject<boolean>
+  pendingAgentsRef: React.MutableRefObject<Array<{ id: number; palette?: number; hueShift?: number; seatId?: string }>>
+  isEditDirty?: () => boolean
+  onLayoutLoaded?: (layout: OfficeLayout) => void
+  setAgents: React.Dispatch<React.SetStateAction<number[]>>
+  setSelectedAgent: React.Dispatch<React.SetStateAction<number | null>>
+  setAgentTools: React.Dispatch<React.SetStateAction<Record<number, ToolActivity[]>>>
+  setAgentStatuses: React.Dispatch<React.SetStateAction<Record<number, string>>>
+  setAgentModels: React.Dispatch<React.SetStateAction<Record<number, string>>>
+  setSubagentTools: React.Dispatch<React.SetStateAction<Record<number, Record<string, ToolActivity[]>>>>
+  setSubagentCharacters: React.Dispatch<React.SetStateAction<SubagentCharacter[]>>
+  setLayoutReady: React.Dispatch<React.SetStateAction<boolean>>
+  setLoadedAssets: React.Dispatch<React.SetStateAction<{ catalog: FurnitureAsset[]; sprites: Record<string, string[][]> } | undefined>>
+  setAgentProjects: React.Dispatch<React.SetStateAction<Record<number, string>>>
+  setAgentTranscripts: React.Dispatch<React.SetStateAction<Record<number, TranscriptEntry[]>>>
+}
+
+// ── Message Handlers ───────────────────────────────────────────
+
+function handleLayoutLoaded(msg: ServerMessage & { type: 'layoutLoaded' }, ctx: HandlerContext): void {
+  if (ctx.layoutReadyRef.current && ctx.isEditDirty?.()) {
+    console.log('[Webview] 跳過外部佈局更新 — 編輯器有未儲存的變更')
+    return
+  }
+  const rawLayout = msg.layout
+  const layout = rawLayout && rawLayout.version === 1 ? migrateLayoutColors(rawLayout) : null
+  if (layout) {
+    ctx.os.rebuildFromLayout(layout)
+    ctx.onLayoutLoaded?.(layout)
+  } else {
+    ctx.onLayoutLoaded?.(ctx.os.getLayout())
+  }
+  for (const p of ctx.pendingAgentsRef.current) {
+    ctx.os.addAgent(p.id, p.palette, p.hueShift, p.seatId, true)
+  }
+  ctx.pendingAgentsRef.current = []
+  ctx.layoutReadyRef.current = true
+  ctx.setLayoutReady(true)
+  if (ctx.os.characters.size > 0) {
+    saveAgentSeats(ctx.os)
+  }
+}
+
+function handleAgentCreated(msg: ServerMessage & { type: 'agentCreated' }, ctx: HandlerContext): void {
+  const { id, projectName } = msg
+  ctx.setAgents((prev) => (prev.includes(id) ? prev : [...prev, id]))
+  ctx.setSelectedAgent(id)
+  if (projectName) {
+    ctx.setAgentProjects((prev) => ({ ...prev, [id]: projectName }))
+  }
+  ctx.os.addAgent(id)
+  saveAgentSeats(ctx.os)
+}
+
+function handleAgentClosed(msg: ServerMessage & { type: 'agentClosed' }, ctx: HandlerContext): void {
+  const { id } = msg
+  ctx.setAgents((prev) => prev.filter((a) => a !== id))
+  ctx.setSelectedAgent((prev) => (prev === id ? null : prev))
+  ctx.setAgentTools((prev) => removeKey(prev, id))
+  ctx.setAgentStatuses((prev) => removeKey(prev, id))
+  ctx.setAgentModels((prev) => removeKey(prev, id))
+  ctx.setAgentProjects((prev) => removeKey(prev, id))
+  ctx.setSubagentTools((prev) => removeKey(prev, id))
+  ctx.setAgentTranscripts((prev) => removeKey(prev, id))
+  ctx.os.removeAllSubagents(id)
+  ctx.setSubagentCharacters((prev) => prev.filter((s) => s.parentAgentId !== id))
+  ctx.os.removeAgent(id)
+}
+
+function handleExistingAgents(msg: ServerMessage & { type: 'existingAgents' }, ctx: HandlerContext): void {
+  const incoming = msg.agents
+  const meta = msg.agentMeta || ({} as Record<number, { palette?: number; hueShift?: number; seatId?: string; isExternal?: boolean; projectName?: string }>)
+  const newProjects: Record<number, string> = {}
+  for (const id of incoming) {
+    const m = meta[id]
+    if (m?.projectName) {
+      newProjects[id] = m.projectName
+    }
+    if (ctx.layoutReadyRef.current) {
+      ctx.os.addAgent(id, m?.palette, m?.hueShift, m?.seatId, true)
+    } else {
+      ctx.pendingAgentsRef.current.push({ id, palette: m?.palette, hueShift: m?.hueShift, seatId: m?.seatId })
+    }
+  }
+  if (Object.keys(newProjects).length > 0) {
+    ctx.setAgentProjects((prev) => ({ ...prev, ...newProjects }))
+  }
+  if (ctx.layoutReadyRef.current && incoming.length > 0) {
+    saveAgentSeats(ctx.os)
+  }
+  ctx.setAgents((prev) => {
+    const ids = new Set(prev)
+    const merged = [...prev]
+    for (const id of incoming) {
+      if (!ids.has(id)) {
+        merged.push(id)
+      }
+    }
+    return merged.sort((a, b) => a - b)
+  })
+}
+
+function handleAgentToolStart(msg: ServerMessage & { type: 'agentToolStart' }, ctx: HandlerContext): void {
+  const { id, toolId, status } = msg
+  ctx.setAgentTools((prev) => {
+    const list = prev[id] || []
+    if (list.some((t) => t.toolId === toolId)) return prev
+    return { ...prev, [id]: [...list, { toolId, status, done: false, startTime: Date.now() }] }
+  })
+  const toolName = extractToolName(status)
+  ctx.os.setAgentTool(id, toolName)
+  ctx.os.setAgentActive(id, true)
+  ctx.os.clearPermissionBubble(id)
+  if (status.startsWith('Subtask:')) {
+    const label = status.slice('Subtask:'.length).trim()
+    const subId = ctx.os.addSubagent(id, toolId)
+    ctx.setSubagentCharacters((prev) => {
+      if (prev.some((s) => s.id === subId)) return prev
+      return [...prev, { id: subId, parentAgentId: id, parentToolId: toolId, label }]
+    })
+  }
+}
+
+function handleAgentToolDone(msg: ServerMessage & { type: 'agentToolDone' }, ctx: HandlerContext): void {
+  const { id, toolId } = msg
+  ctx.setAgentTools((prev) => {
+    const list = prev[id]
+    if (!list) return prev
+    return {
+      ...prev,
+      [id]: list.map((t) => (t.toolId === toolId ? { ...t, done: true, endTime: Date.now() } : t)),
+    }
+  })
+}
+
+function handleAgentToolsClear(msg: ServerMessage & { type: 'agentToolsClear' }, ctx: HandlerContext): void {
+  const { id } = msg
+  ctx.setAgentTools((prev) => removeKey(prev, id))
+  ctx.setSubagentTools((prev) => removeKey(prev, id))
+  ctx.os.removeAllSubagents(id)
+  ctx.setSubagentCharacters((prev) => prev.filter((s) => s.parentAgentId !== id))
+  ctx.os.setAgentTool(id, null)
+  ctx.os.clearPermissionBubble(id)
+}
+
+function handleAgentSelected(msg: ServerMessage & { type: 'agentSelected' }, ctx: HandlerContext): void {
+  ctx.setSelectedAgent(msg.id)
+}
+
+function handleAgentStatus(msg: ServerMessage & { type: 'agentStatus' }, ctx: HandlerContext): void {
+  const { id, status } = msg
+  ctx.setAgentStatuses((prev) => {
+    if (status === 'active') return removeKey(prev, id)
+    return { ...prev, [id]: status }
+  })
+  ctx.os.setAgentActive(id, status === 'active')
+  if (status === 'waiting') {
+    ctx.os.showWaitingBubble(id)
+    playDoneSound()
+  }
+}
+
+function handleAgentToolPermission(msg: ServerMessage & { type: 'agentToolPermission' }, ctx: HandlerContext): void {
+  const { id } = msg
+  ctx.setAgentTools((prev) => {
+    const list = prev[id]
+    if (!list) return prev
+    return {
+      ...prev,
+      [id]: list.map((t) => (t.done ? t : { ...t, permissionWait: true })),
+    }
+  })
+  ctx.os.showPermissionBubble(id)
+}
+
+function handleSubagentToolPermission(msg: ServerMessage & { type: 'subagentToolPermission' }, ctx: HandlerContext): void {
+  const { id, parentToolId } = msg
+  const subId = ctx.os.getSubagentId(id, parentToolId)
+  if (subId !== null) {
+    ctx.os.showPermissionBubble(subId)
+  }
+}
+
+function handleAgentToolPermissionClear(msg: ServerMessage & { type: 'agentToolPermissionClear' }, ctx: HandlerContext): void {
+  const { id } = msg
+  ctx.setAgentTools((prev) => {
+    const list = prev[id]
+    if (!list) return prev
+    const hasPermission = list.some((t) => t.permissionWait)
+    if (!hasPermission) return prev
+    return {
+      ...prev,
+      [id]: list.map((t) => (t.permissionWait ? { ...t, permissionWait: false } : t)),
+    }
+  })
+  ctx.os.clearPermissionBubble(id)
+  for (const [subId, meta] of ctx.os.subagentMeta) {
+    if (meta.parentAgentId === id) {
+      ctx.os.clearPermissionBubble(subId)
+    }
+  }
+}
+
+function handleSubagentToolStart(msg: ServerMessage & { type: 'subagentToolStart' }, ctx: HandlerContext): void {
+  const { id, parentToolId, toolId, status } = msg
+  ctx.setSubagentTools((prev) => {
+    const agentSubs = prev[id] || {}
+    const list = agentSubs[parentToolId] || []
+    if (list.some((t) => t.toolId === toolId)) return prev
+    return { ...prev, [id]: { ...agentSubs, [parentToolId]: [...list, { toolId, status, done: false, startTime: Date.now() }] } }
+  })
+  const subId = ctx.os.getSubagentId(id, parentToolId)
+  if (subId !== null) {
+    const subToolName = extractToolName(status)
+    ctx.os.setAgentTool(subId, subToolName)
+    ctx.os.setAgentActive(subId, true)
+  }
+}
+
+function handleSubagentToolDone(msg: ServerMessage & { type: 'subagentToolDone' }, ctx: HandlerContext): void {
+  const { id, parentToolId, toolId } = msg
+  ctx.setSubagentTools((prev) => {
+    const agentSubs = prev[id]
+    if (!agentSubs) return prev
+    const list = agentSubs[parentToolId]
+    if (!list) return prev
+    return {
+      ...prev,
+      [id]: { ...agentSubs, [parentToolId]: list.map((t) => (t.toolId === toolId ? { ...t, done: true, endTime: Date.now() } : t)) },
+    }
+  })
+}
+
+function handleSubagentClear(msg: ServerMessage & { type: 'subagentClear' }, ctx: HandlerContext): void {
+  const { id, parentToolId } = msg
+  ctx.setSubagentTools((prev) => {
+    const agentSubs = prev[id]
+    if (!agentSubs || !(parentToolId in agentSubs)) return prev
+    const next = { ...agentSubs }
+    delete next[parentToolId]
+    if (Object.keys(next).length === 0) {
+      const outer = { ...prev }
+      delete outer[id]
+      return outer
+    }
+    return { ...prev, [id]: next }
+  })
+  ctx.os.removeSubagent(id, parentToolId)
+  ctx.setSubagentCharacters((prev) => prev.filter((s) => !(s.parentAgentId === id && s.parentToolId === parentToolId)))
+}
+
+function handleAgentEmote(msg: ServerMessage & { type: 'agentEmote' }, ctx: HandlerContext): void {
+  ctx.os.showEmote(msg.id, msg.emote as EmoteType)
+}
+
+function handleAgentThinking(msg: ServerMessage & { type: 'agentThinking' }, ctx: HandlerContext): void {
+  ctx.os.setAgentThinking(msg.id, msg.thinking)
+}
+
+function handleAgentDetached(msg: ServerMessage & { type: 'agentDetached' }, ctx: HandlerContext): void {
+  ctx.os.setAgentDetached(msg.id, msg.detached)
+}
+
+function handleAgentModel(msg: ServerMessage & { type: 'agentModel' }, ctx: HandlerContext): void {
+  const { id, model } = msg
+  ctx.setAgentModels((prev) => {
+    if (prev[id] === model) return prev
+    return { ...prev, [id]: model }
+  })
+}
+
+function handleCharacterSpritesLoaded(msg: ServerMessage & { type: 'characterSpritesLoaded' }): void {
+  console.log(`[Webview] 收到 ${msg.characters.length} 個預著色角色精靈圖`)
+  setCharacterTemplates(msg.characters)
+}
+
+function handleFloorTilesLoaded(msg: ServerMessage & { type: 'floorTilesLoaded' }): void {
+  console.log(`[Webview] 收到 ${msg.sprites.length} 個地板花紋`)
+  setFloorSprites(msg.sprites)
+}
+
+function handleWallTilesLoaded(msg: ServerMessage & { type: 'wallTilesLoaded' }): void {
+  console.log(`[Webview] 收到 ${msg.sprites.length} 個牆磚精靈圖`)
+  setWallSprites(msg.sprites)
+}
+
+function handleSettingsLoaded(msg: ServerMessage & { type: 'settingsLoaded' }): void {
+  setSoundEnabled(msg.soundEnabled)
+}
+
+function handleFurnitureAssetsLoaded(msg: ServerMessage & { type: 'furnitureAssetsLoaded' }, ctx: HandlerContext): void {
+  try {
+    const { catalog, sprites } = msg
+    console.log(`Webview: 載入了 ${catalog.length} 個家具素材`)
+    buildDynamicCatalog({ catalog, sprites })
+    ctx.setLoadedAssets({ catalog, sprites })
+  } catch (err) {
+    console.error(`Webview: 處理 furnitureAssetsLoaded 時發生錯誤:`, err)
+  }
+}
+
+function handleAgentTranscript(msg: ServerMessage & { type: 'agentTranscript' }, ctx: HandlerContext): void {
+  const { id, log } = msg
+  ctx.setAgentTranscripts((prev) => ({ ...prev, [id]: log }))
+}
+
+// ── Handler 查找表 ──────────────────────────────────────────────
+
+type HandlerFn = (msg: never, ctx: HandlerContext) => void
+
+const messageHandlers: Record<string, HandlerFn> = {
+  layoutLoaded: handleLayoutLoaded as HandlerFn,
+  agentCreated: handleAgentCreated as HandlerFn,
+  agentClosed: handleAgentClosed as HandlerFn,
+  existingAgents: handleExistingAgents as HandlerFn,
+  agentToolStart: handleAgentToolStart as HandlerFn,
+  agentToolDone: handleAgentToolDone as HandlerFn,
+  agentToolsClear: handleAgentToolsClear as HandlerFn,
+  agentSelected: handleAgentSelected as HandlerFn,
+  agentStatus: handleAgentStatus as HandlerFn,
+  agentToolPermission: handleAgentToolPermission as HandlerFn,
+  agentToolPermissionClear: handleAgentToolPermissionClear as HandlerFn,
+  subagentToolPermission: handleSubagentToolPermission as HandlerFn,
+  subagentToolStart: handleSubagentToolStart as HandlerFn,
+  subagentToolDone: handleSubagentToolDone as HandlerFn,
+  subagentClear: handleSubagentClear as HandlerFn,
+  agentEmote: handleAgentEmote as HandlerFn,
+  agentThinking: handleAgentThinking as HandlerFn,
+  agentDetached: handleAgentDetached as HandlerFn,
+  agentModel: handleAgentModel as HandlerFn,
+  characterSpritesLoaded: handleCharacterSpritesLoaded as HandlerFn,
+  floorTilesLoaded: handleFloorTilesLoaded as HandlerFn,
+  wallTilesLoaded: handleWallTilesLoaded as HandlerFn,
+  settingsLoaded: handleSettingsLoaded as HandlerFn,
+  furnitureAssetsLoaded: handleFurnitureAssetsLoaded as HandlerFn,
+  agentTranscript: handleAgentTranscript as HandlerFn,
+}
+
+// ── Hook ────────────────────────────────────────────────────────
 
 export function useExtensionMessages(
   getOfficeState: () => OfficeState,
@@ -82,256 +435,37 @@ export function useExtensionMessages(
   const [layoutReady, setLayoutReady] = useState(false)
   const [loadedAssets, setLoadedAssets] = useState<{ catalog: FurnitureAsset[]; sprites: Record<string, string[][]> } | undefined>()
   const [agentProjects, setAgentProjects] = useState<Record<number, string>>({})
+  const [agentTranscripts, setAgentTranscripts] = useState<Record<number, TranscriptEntry[]>>({})
 
   const layoutReadyRef = useRef(false)
   const pendingAgentsRef = useRef<Array<{ id: number; palette?: number; hueShift?: number; seatId?: string }>>([])
 
   useEffect(() => {
+    const ctx: HandlerContext = {
+      os: getOfficeState(),
+      layoutReadyRef,
+      pendingAgentsRef,
+      isEditDirty,
+      onLayoutLoaded,
+      setAgents,
+      setSelectedAgent,
+      setAgentTools,
+      setAgentStatuses,
+      setAgentModels,
+      setSubagentTools,
+      setSubagentCharacters,
+      setLayoutReady,
+      setLoadedAssets,
+      setAgentProjects,
+      setAgentTranscripts,
+    }
+
     const handler = (data: unknown) => {
       const msg = data as ServerMessage
-      const os = getOfficeState()
-
-      if (msg.type === 'layoutLoaded') {
-        if (layoutReadyRef.current && isEditDirty?.()) {
-          console.log('[Webview] 跳過外部佈局更新 — 編輯器有未儲存的變更')
-          return
-        }
-        const rawLayout = msg.layout
-        const layout = rawLayout && rawLayout.version === 1 ? migrateLayoutColors(rawLayout) : null
-        if (layout) {
-          os.rebuildFromLayout(layout)
-          onLayoutLoaded?.(layout)
-        } else {
-          onLayoutLoaded?.(os.getLayout())
-        }
-        for (const p of pendingAgentsRef.current) {
-          os.addAgent(p.id, p.palette, p.hueShift, p.seatId, true)
-        }
-        pendingAgentsRef.current = []
-        layoutReadyRef.current = true
-        setLayoutReady(true)
-        if (os.characters.size > 0) {
-          saveAgentSeats(os)
-        }
-      } else if (msg.type === 'agentCreated') {
-        const { id, projectName } = msg
-        setAgents((prev) => (prev.includes(id) ? prev : [...prev, id]))
-        setSelectedAgent(id)
-        if (projectName) {
-          setAgentProjects((prev) => ({ ...prev, [id]: projectName }))
-        }
-        os.addAgent(id)
-        saveAgentSeats(os)
-      } else if (msg.type === 'agentClosed') {
-        const { id } = msg
-        setAgents((prev) => prev.filter((a) => a !== id))
-        setSelectedAgent((prev) => (prev === id ? null : prev))
-        setAgentTools((prev) => removeKey(prev, id))
-        setAgentStatuses((prev) => removeKey(prev, id))
-        setAgentModels((prev) => removeKey(prev, id))
-        setAgentProjects((prev) => removeKey(prev, id))
-        setSubagentTools((prev) => removeKey(prev, id))
-        os.removeAllSubagents(id)
-        setSubagentCharacters((prev) => prev.filter((s) => s.parentAgentId !== id))
-        os.removeAgent(id)
-      } else if (msg.type === 'existingAgents') {
-        const incoming = msg.agents
-        const meta = msg.agentMeta || ({} as Record<number, { palette?: number; hueShift?: number; seatId?: string; isExternal?: boolean; projectName?: string }>)
-        const newProjects: Record<number, string> = {}
-        for (const id of incoming) {
-          const m = meta[id]
-          if (m?.projectName) {
-            newProjects[id] = m.projectName
-          }
-          if (layoutReadyRef.current) {
-            os.addAgent(id, m?.palette, m?.hueShift, m?.seatId, true)
-          } else {
-            pendingAgentsRef.current.push({ id, palette: m?.palette, hueShift: m?.hueShift, seatId: m?.seatId })
-          }
-        }
-        if (Object.keys(newProjects).length > 0) {
-          setAgentProjects((prev) => ({ ...prev, ...newProjects }))
-        }
-        if (layoutReadyRef.current && incoming.length > 0) {
-          saveAgentSeats(os)
-        }
-        setAgents((prev) => {
-          const ids = new Set(prev)
-          const merged = [...prev]
-          for (const id of incoming) {
-            if (!ids.has(id)) {
-              merged.push(id)
-            }
-          }
-          return merged.sort((a, b) => a - b)
-        })
-      } else if (msg.type === 'agentToolStart') {
-        const { id, toolId, status } = msg
-        setAgentTools((prev) => {
-          const list = prev[id] || []
-          if (list.some((t) => t.toolId === toolId)) return prev
-          return { ...prev, [id]: [...list, { toolId, status, done: false, startTime: Date.now() }] }
-        })
-        const toolName = extractToolName(status)
-        os.setAgentTool(id, toolName)
-        os.setAgentActive(id, true)
-        os.clearPermissionBubble(id)
-        if (status.startsWith('Subtask:')) {
-          const label = status.slice('Subtask:'.length).trim()
-          const subId = os.addSubagent(id, toolId)
-          setSubagentCharacters((prev) => {
-            if (prev.some((s) => s.id === subId)) return prev
-            return [...prev, { id: subId, parentAgentId: id, parentToolId: toolId, label }]
-          })
-        }
-      } else if (msg.type === 'agentToolDone') {
-        const { id, toolId } = msg
-        setAgentTools((prev) => {
-          const list = prev[id]
-          if (!list) return prev
-          return {
-            ...prev,
-            [id]: list.map((t) => (t.toolId === toolId ? { ...t, done: true, endTime: Date.now() } : t)),
-          }
-        })
-      } else if (msg.type === 'agentToolsClear') {
-        const { id } = msg
-        setAgentTools((prev) => removeKey(prev, id))
-        setSubagentTools((prev) => removeKey(prev, id))
-        os.removeAllSubagents(id)
-        setSubagentCharacters((prev) => prev.filter((s) => s.parentAgentId !== id))
-        os.setAgentTool(id, null)
-        os.clearPermissionBubble(id)
-      } else if (msg.type === 'agentSelected') {
-        const { id } = msg
-        setSelectedAgent(id)
-      } else if (msg.type === 'agentStatus') {
-        const { id, status } = msg
-        setAgentStatuses((prev) => {
-          if (status === 'active') return removeKey(prev, id)
-          return { ...prev, [id]: status }
-        })
-        os.setAgentActive(id, status === 'active')
-        if (status === 'waiting') {
-          os.showWaitingBubble(id)
-          playDoneSound()
-        }
-      } else if (msg.type === 'agentToolPermission') {
-        const { id } = msg
-        setAgentTools((prev) => {
-          const list = prev[id]
-          if (!list) return prev
-          return {
-            ...prev,
-            [id]: list.map((t) => (t.done ? t : { ...t, permissionWait: true })),
-          }
-        })
-        os.showPermissionBubble(id)
-      } else if (msg.type === 'subagentToolPermission') {
-        const { id, parentToolId } = msg
-        const subId = os.getSubagentId(id, parentToolId)
-        if (subId !== null) {
-          os.showPermissionBubble(subId)
-        }
-      } else if (msg.type === 'agentToolPermissionClear') {
-        const { id } = msg
-        setAgentTools((prev) => {
-          const list = prev[id]
-          if (!list) return prev
-          const hasPermission = list.some((t) => t.permissionWait)
-          if (!hasPermission) return prev
-          return {
-            ...prev,
-            [id]: list.map((t) => (t.permissionWait ? { ...t, permissionWait: false } : t)),
-          }
-        })
-        os.clearPermissionBubble(id)
-        for (const [subId, meta] of os.subagentMeta) {
-          if (meta.parentAgentId === id) {
-            os.clearPermissionBubble(subId)
-          }
-        }
-      } else if (msg.type === 'subagentToolStart') {
-        const { id, parentToolId, toolId, status } = msg
-        setSubagentTools((prev) => {
-          const agentSubs = prev[id] || {}
-          const list = agentSubs[parentToolId] || []
-          if (list.some((t) => t.toolId === toolId)) return prev
-          return { ...prev, [id]: { ...agentSubs, [parentToolId]: [...list, { toolId, status, done: false, startTime: Date.now() }] } }
-        })
-        const subId = os.getSubagentId(id, parentToolId)
-        if (subId !== null) {
-          const subToolName = extractToolName(status)
-          os.setAgentTool(subId, subToolName)
-          os.setAgentActive(subId, true)
-        }
-      } else if (msg.type === 'subagentToolDone') {
-        const { id, parentToolId, toolId } = msg
-        setSubagentTools((prev) => {
-          const agentSubs = prev[id]
-          if (!agentSubs) return prev
-          const list = agentSubs[parentToolId]
-          if (!list) return prev
-          return {
-            ...prev,
-            [id]: { ...agentSubs, [parentToolId]: list.map((t) => (t.toolId === toolId ? { ...t, done: true, endTime: Date.now() } : t)) },
-          }
-        })
-      } else if (msg.type === 'subagentClear') {
-        const { id, parentToolId } = msg
-        setSubagentTools((prev) => {
-          const agentSubs = prev[id]
-          if (!agentSubs || !(parentToolId in agentSubs)) return prev
-          const next = { ...agentSubs }
-          delete next[parentToolId]
-          if (Object.keys(next).length === 0) {
-            const outer = { ...prev }
-            delete outer[id]
-            return outer
-          }
-          return { ...prev, [id]: next }
-        })
-        os.removeSubagent(id, parentToolId)
-        setSubagentCharacters((prev) => prev.filter((s) => !(s.parentAgentId === id && s.parentToolId === parentToolId)))
-      } else if (msg.type === 'agentEmote') {
-        const { id, emote } = msg
-        os.showEmote(id, emote as EmoteType)
-      } else if (msg.type === 'agentThinking') {
-        const { id, thinking } = msg
-        os.setAgentThinking(id, thinking)
-      } else if (msg.type === 'agentDetached') {
-        const { id, detached } = msg
-        os.setAgentDetached(id, detached)
-      } else if (msg.type === 'agentModel') {
-        const { id, model } = msg
-        setAgentModels((prev) => {
-          if (prev[id] === model) return prev
-          return { ...prev, [id]: model }
-        })
-      } else if (msg.type === 'characterSpritesLoaded') {
-        const { characters } = msg
-        console.log(`[Webview] 收到 ${characters.length} 個預著色角色精靈圖`)
-        setCharacterTemplates(characters)
-      } else if (msg.type === 'floorTilesLoaded') {
-        const { sprites } = msg
-        console.log(`[Webview] 收到 ${sprites.length} 個地板花紋`)
-        setFloorSprites(sprites)
-      } else if (msg.type === 'wallTilesLoaded') {
-        const { sprites } = msg
-        console.log(`[Webview] 收到 ${sprites.length} 個牆磚精靈圖`)
-        setWallSprites(sprites)
-      } else if (msg.type === 'settingsLoaded') {
-        setSoundEnabled(msg.soundEnabled)
-      } else if (msg.type === 'furnitureAssetsLoaded') {
-        try {
-          const { catalog, sprites } = msg
-          console.log(`Webview: 載入了 ${catalog.length} 個家具素材`)
-          buildDynamicCatalog({ catalog, sprites })
-          setLoadedAssets({ catalog, sprites })
-        } catch (err) {
-          console.error(`Webview: 處理 furnitureAssetsLoaded 時發生錯誤:`, err)
-        }
-      }
+      // 每次呼叫確保 os 為最新
+      ctx.os = getOfficeState()
+      const fn = messageHandlers[msg.type]
+      if (fn) fn(msg as never, ctx)
     }
 
     const unsub = onServerMessage(handler)
@@ -339,5 +473,5 @@ export function useExtensionMessages(
     return unsub
   }, [getOfficeState])
 
-  return { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects }
+  return { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, agentTranscripts }
 }

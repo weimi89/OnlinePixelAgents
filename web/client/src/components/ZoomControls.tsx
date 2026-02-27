@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import {
   ZOOM_MIN,
   ZOOM_MAX,
@@ -28,7 +28,7 @@ const btnBase: React.CSSProperties = {
   boxShadow: 'var(--pixel-shadow)',
 }
 
-export function ZoomControls({ zoom, onZoomChange }: ZoomControlsProps) {
+export const ZoomControls = memo(function ZoomControls({ zoom, onZoomChange }: ZoomControlsProps) {
   const [hovered, setHovered] = useState<'minus' | 'plus' | null>(null)
   const [showLevel, setShowLevel] = useState(false)
   const [fadeOut, setFadeOut] = useState(false)
@@ -146,4 +146,4 @@ export function ZoomControls({ zoom, onZoomChange }: ZoomControlsProps) {
       </div>
     </>
   )
-}
+})

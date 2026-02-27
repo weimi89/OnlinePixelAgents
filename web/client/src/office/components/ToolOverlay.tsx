@@ -1,8 +1,8 @@
 import type { ToolActivity } from '../types.js'
 import type { OfficeState } from '../engine/officeState.js'
 import type { SubagentCharacter, TranscriptEntry } from '../../hooks/useExtensionMessages.js'
-import { TILE_SIZE } from '../types.js'
 import { extractToolName } from '../toolUtils.js'
+import { computeCanvasMetrics } from './canvasMetrics.js'
 import { isSittingState } from '../engine/characters.js'
 import { TOOL_OVERLAY_VERTICAL_OFFSET, CHARACTER_SITTING_OFFSET_PX, TOOL_TYPE_COLORS } from '../../constants.js'
 import { t } from '../../i18n.js'
@@ -113,15 +113,8 @@ export function ToolOverlay({
 
   const el = containerRef.current
   if (!el) return null
-  const rect = el.getBoundingClientRect()
-  const dpr = window.devicePixelRatio || 1
-  const canvasW = Math.round(rect.width * dpr)
-  const canvasH = Math.round(rect.height * dpr)
   const layout = officeState.getLayout()
-  const mapW = layout.cols * TILE_SIZE * zoom
-  const mapH = layout.rows * TILE_SIZE * zoom
-  const deviceOffsetX = Math.floor((canvasW - mapW) / 2) + Math.round(panRef.current.x)
-  const deviceOffsetY = Math.floor((canvasH - mapH) / 2) + Math.round(panRef.current.y)
+  const { deviceOffsetX, deviceOffsetY, dpr } = computeCanvasMetrics(el, layout.cols, layout.rows, zoom, panRef.current)
 
   const selectedId = officeState.selectedAgentId
   const hoveredId = officeState.hoveredAgentId

@@ -1,6 +1,6 @@
 import { TileType, TILE_SIZE } from '../types.js'
 import type { TileType as TileTypeVal, FurnitureInstance, Character, SpriteData, Seat, FloorColor } from '../types.js'
-import { getCachedSprite, getOutlineSprite } from '../sprites/spriteCache.js'
+import { getCachedSprite, getOutlineSprite, tintCanvas } from '../sprites/spriteCache.js'
 import { getCharacterSprites, BUBBLE_PERMISSION_SPRITE, BUBBLE_WAITING_SPRITE, BUBBLE_DETACHED_SPRITE, getEmoteSprite } from '../sprites/spriteData.js'
 import { getCharacterSprite, isSittingState } from './characters.js'
 import { renderMatrixEffect } from './matrixEffect.js'
@@ -41,6 +41,8 @@ import {
   DETACHED_CHARACTER_ALPHA,
   EMOTE_VERTICAL_OFFSET_PX,
   EMOTE_FADE_DURATION_SEC,
+  SUBAGENT_GLOW_COLOR,
+  SUBAGENT_GLOW_ALPHA,
 } from '../../constants.js'
 
 // ── 渲染函式 ────────────────────────────────────────────
@@ -168,6 +170,24 @@ export function renderScene(
           c.save()
           c.globalAlpha = outlineAlpha
           c.drawImage(outlineCached, olDrawX, olDrawY)
+          c.restore()
+        },
+      })
+    }
+
+    // 子代理永久光暈（淡藍色輪廓，與選取/懸停輪廓獨立）
+    if (ch.isSubagent && !isSelected && !isHovered) {
+      const outlineData = getOutlineSprite(spriteData)
+      const outlineCached = getCachedSprite(outlineData, zoom)
+      const tinted = tintCanvas(outlineCached, SUBAGENT_GLOW_COLOR)
+      const glowDrawX = drawX - zoom
+      const glowDrawY = drawY - zoom
+      drawables.push({
+        zY: charZY - OUTLINE_Z_SORT_OFFSET,
+        draw: (c) => {
+          c.save()
+          c.globalAlpha = SUBAGENT_GLOW_ALPHA
+          c.drawImage(tinted, glowDrawX, glowDrawY)
           c.restore()
         },
       })

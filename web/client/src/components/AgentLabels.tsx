@@ -1,9 +1,9 @@
 import { memo } from 'react'
 import type { OfficeState } from '../office/engine/officeState.js'
 import type { SubagentCharacter } from '../hooks/useExtensionMessages.js'
-import { TILE_SIZE } from '../office/types.js'
 import { isSittingState } from '../office/engine/characters.js'
 import { useRenderTick } from '../hooks/useRenderTick.js'
+import { computeCanvasMetrics } from '../office/components/canvasMetrics.js'
 
 interface AgentLabelsProps {
   officeState: OfficeState
@@ -28,16 +28,8 @@ export const AgentLabels = memo(function AgentLabels({
 
   const el = containerRef.current
   if (!el) return null
-  const rect = el.getBoundingClientRect()
-  const dpr = window.devicePixelRatio || 1
-  // 計算裝置像素偏移（與 renderFrame 相同的計算，包含平移）
-  const canvasW = Math.round(rect.width * dpr)
-  const canvasH = Math.round(rect.height * dpr)
   const layout = officeState.getLayout()
-  const mapW = layout.cols * TILE_SIZE * zoom
-  const mapH = layout.rows * TILE_SIZE * zoom
-  const deviceOffsetX = Math.floor((canvasW - mapW) / 2) + Math.round(panRef.current.x)
-  const deviceOffsetY = Math.floor((canvasH - mapH) / 2) + Math.round(panRef.current.y)
+  const { deviceOffsetX, deviceOffsetY, dpr } = computeCanvasMetrics(el, layout.cols, layout.rows, zoom, panRef.current)
 
   const selectedId = officeState.selectedAgentId
   const hoveredId = officeState.hoveredAgentId

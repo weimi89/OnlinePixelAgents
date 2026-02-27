@@ -40,6 +40,19 @@ export interface PersistedAgent {
 	tmuxSessionName?: string;
 }
 
+/** 客戶端 → 伺服器的 Socket.IO 訊息型別 */
+export type ClientMessage =
+	| { type: 'webviewReady' }
+	| { type: 'openClaude' }
+	| { type: 'closeAgent'; id: number }
+	| { type: 'focusAgent'; id: number }
+	| { type: 'saveAgentSeats'; seats: Record<number, { palette: number; hueShift: number; seatId: string | null }> }
+	| { type: 'saveLayout'; layout: Record<string, unknown> }
+	| { type: 'setSoundEnabled'; enabled: boolean }
+	| { type: 'listSessions' }
+	| { type: 'resumeSession'; sessionId: string; projectDir: string }
+	| { type: 'requestExportLayout' };
+
 /** 代理上下文 — 集中管理所有共享狀態與計時器，避免函式傳遞大量參數 */
 export interface AgentContext {
 	agents: Map<number, AgentState>;

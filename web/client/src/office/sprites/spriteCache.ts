@@ -49,6 +49,33 @@ export function getOutlineSprite(sprite: SpriteData): SpriteData {
 /** 清除所有縮放快取 */
 export function clearSpriteCaches(): void {
   zoomCaches.clear()
+  tintCache = new WeakMap()
+}
+
+// ── 著色覆蓋 ───────────────────────────────────────
+
+let tintCache = new WeakMap<HTMLCanvasElement, Map<string, HTMLCanvasElement>>()
+
+/** 以 source-atop 混合模式將 canvas 中的不透明像素著色為指定顏色，結果快取 */
+export function tintCanvas(source: HTMLCanvasElement, color: string): HTMLCanvasElement {
+  let colorMap = tintCache.get(source)
+  if (!colorMap) {
+    colorMap = new Map()
+    tintCache.set(source, colorMap)
+  }
+  const cached = colorMap.get(color)
+  if (cached) return cached
+
+  const canvas = document.createElement('canvas')
+  canvas.width = source.width
+  canvas.height = source.height
+  const c = canvas.getContext('2d')!
+  c.drawImage(source, 0, 0)
+  c.globalCompositeOperation = 'source-atop'
+  c.fillStyle = color
+  c.fillRect(0, 0, canvas.width, canvas.height)
+  colorMap.set(color, canvas)
+  return canvas
 }
 
 export function getCachedSprite(sprite: SpriteData, zoom: number): HTMLCanvasElement {

@@ -200,6 +200,15 @@ function checkStaleAgents(ctx: AgentContext): void {
 		}
 	}
 	for (const id of staleIds) {
+		const agent = agents.get(id);
+		if (agent && agent.activeToolIds.size > 0) {
+			agent.activeToolIds.clear();
+			agent.activeToolStatuses.clear();
+			agent.activeToolNames.clear();
+			agent.activeSubagentToolIds.clear();
+			agent.activeSubagentToolNames.clear();
+			sender?.postMessage({ type: 'agentToolsClear', id });
+		}
 		removeAgent(id, ctx);
 		sender?.postMessage({ type: 'agentClosed', id });
 	}

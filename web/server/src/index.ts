@@ -8,7 +8,7 @@ import { Server } from 'socket.io';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-import type { AgentContext, AgentState, MessageSender } from './types.js';
+import type { AgentContext, AgentState, ClientMessage, MessageSender } from './types.js';
 import {
 	loadFurnitureAssets,
 	loadFloorTiles,
@@ -212,8 +212,8 @@ async function main(): Promise<void> {
 			},
 		};
 
-		socket.on('message', (msg: Record<string, unknown>) => {
-			handleClientMessage(msg, directSender);
+		socket.on('message', (msg: unknown) => {
+			handleClientMessage(msg as ClientMessage, directSender);
 		});
 
 		socket.on('disconnect', () => {
@@ -290,7 +290,7 @@ function setupGracefulShutdown(
 	process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
-function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender): void {
+function handleClientMessage(msg: ClientMessage, sender: MessageSender): void {
 	console.log(`[Pixel Agents] Received message: ${msg.type}`);
 	switch (msg.type) {
 		case 'webviewReady': {
@@ -366,8 +366,7 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 			break;
 		}
 		case 'closeAgent': {
-			const id = msg.id as number;
-			closeAgent(id, ctx);
+			closeAgent(msg.id, ctx);
 			break;
 		}
 		case 'focusAgent': {
@@ -379,7 +378,7 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 			break;
 		}
 		case 'saveLayout': {
-			writeLayoutToFile(msg.layout as Record<string, unknown>);
+			writeLayoutToFile(msg.layout);
 			break;
 		}
 		case 'setSoundEnabled': {
@@ -394,9 +393,7 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 			break;
 		}
 		case 'resumeSession': {
-			const sessionId = msg.sessionId as string;
-			const sessionProjectDir = msg.projectDir as string;
-			resumeSession(sessionId, sessionProjectDir, cwd, ctx);
+			resumeSession(msg.sessionId, msg.projectDir, cwd, ctx);
 			break;
 		}
 		case 'requestExportLayout': {

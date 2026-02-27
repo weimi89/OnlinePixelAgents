@@ -1,4 +1,4 @@
-import { execSync, spawn } from 'child_process';
+import { spawnSync, spawn } from 'child_process';
 
 export const TMUX_SESSION_PREFIX = 'pixel-agents';
 
@@ -6,12 +6,8 @@ let tmuxAvailable: boolean | null = null;
 
 export function isTmuxAvailable(): boolean {
 	if (tmuxAvailable !== null) return tmuxAvailable;
-	try {
-		execSync('which tmux', { encoding: 'utf-8', stdio: 'pipe' });
-		tmuxAvailable = true;
-	} catch {
-		tmuxAvailable = false;
-	}
+	const result = spawnSync('which', ['tmux'], { encoding: 'utf-8', stdio: 'pipe' });
+	tmuxAvailable = result.status === 0;
 	return tmuxAvailable;
 }
 
@@ -55,41 +51,30 @@ export function createTmuxSession(
 
 /** 依名稱終止 tmux 會話 */
 export function killTmuxSession(sessionName: string): void {
-	try {
-		execSync(`tmux kill-session -t ${JSON.stringify(sessionName)}`, {
-			encoding: 'utf-8',
-			stdio: 'pipe',
-		});
-	} catch {
-		// 會話可能已經結束
-	}
+	spawnSync('tmux', ['kill-session', '-t', sessionName], {
+		encoding: 'utf-8',
+		stdio: 'pipe',
+	});
 }
 
 /** 檢查 tmux 會話是否仍然存活 */
 export function isTmuxSessionAlive(sessionName: string): boolean {
-	try {
-		execSync(`tmux has-session -t ${JSON.stringify(sessionName)}`, {
-			encoding: 'utf-8',
-			stdio: 'pipe',
-		});
-		return true;
-	} catch {
-		return false;
-	}
+	const result = spawnSync('tmux', ['has-session', '-t', sessionName], {
+		encoding: 'utf-8',
+		stdio: 'pipe',
+	});
+	return result.status === 0;
 }
 
 /** 列出所有目前存活的 pixel-agents tmux 會話 */
 export function listPixelAgentSessions(): string[] {
-	try {
-		const output = execSync('tmux list-sessions -F "#{session_name}"', {
-			encoding: 'utf-8',
-			stdio: 'pipe',
-		});
-		return output
-			.split('\n')
-			.map(s => s.trim())
-			.filter(s => s.startsWith(`${TMUX_SESSION_PREFIX}-`));
-	} catch {
-		return [];
-	}
+	const result = spawnSync('tmux', ['list-sessions', '-F', '#{session_name}'], {
+		encoding: 'utf-8',
+		stdio: 'pipe',
+	});
+	if (result.status !== 0) return [];
+	return (result.stdout || '')
+		.split('\n')
+		.map(s => s.trim())
+		.filter(s => s.startsWith(`${TMUX_SESSION_PREFIX}-`));
 }

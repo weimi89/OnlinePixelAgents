@@ -56,6 +56,8 @@ export interface ExtensionMessageState {
   loadedAssets?: { catalog: FurnitureAsset[]; sprites: Record<string, string[][]> }
   /** agentId → projectName，僅外部專案代理有條目 */
   agentProjects: Record<number, string>
+  /** agentId → { owner }，僅遠端代理有條目 */
+  remoteAgents: Record<number, { owner: string }>
   /** agentId → 轉錄記錄陣列 */
   agentTranscripts: Record<number, TranscriptEntry[]>
   /** 被排除的專案目錄 basename 清單 */
@@ -104,6 +106,7 @@ interface HandlerContext {
   setLayoutReady: React.Dispatch<React.SetStateAction<boolean>>
   setLoadedAssets: React.Dispatch<React.SetStateAction<{ catalog: FurnitureAsset[]; sprites: Record<string, string[][]> } | undefined>>
   setAgentProjects: React.Dispatch<React.SetStateAction<Record<number, string>>>
+  setRemoteAgents: React.Dispatch<React.SetStateAction<Record<number, { owner: string }>>>
   setAgentTranscripts: React.Dispatch<React.SetStateAction<Record<number, TranscriptEntry[]>>>
   setExcludedProjects: React.Dispatch<React.SetStateAction<string[]>>
   setProjectDirs: React.Dispatch<React.SetStateAction<{ name: string; excluded: boolean }[]>>
@@ -145,6 +148,10 @@ function handleAgentCreated(msg: ServerMessage & { type: 'agentCreated' }, ctx: 
   if (projectName) {
     ctx.setAgentProjects((prev) => ({ ...prev, [id]: projectName }))
   }
+  if (msg.isRemote && msg.owner) {
+    ctx.setRemoteAgents((prev) => ({ ...prev, [id]: { owner: msg.owner! } }))
+    ctx.os.setAgentRemote(id, true)
+  }
   ctx.os.addAgent(id)
   saveAgentSeats(ctx.os)
 }
@@ -157,6 +164,7 @@ function handleAgentClosed(msg: ServerMessage & { type: 'agentClosed' }, ctx: Ha
   ctx.setAgentStatuses((prev) => removeKey(prev, id))
   ctx.setAgentModels((prev) => removeKey(prev, id))
   ctx.setAgentProjects((prev) => removeKey(prev, id))
+  ctx.setRemoteAgents((prev) => removeKey(prev, id))
   ctx.setSubagentTools((prev) => removeKey(prev, id))
   ctx.setAgentTranscripts((prev) => removeKey(prev, id))
   ctx.os.removeAllSubagents(id)
@@ -166,12 +174,17 @@ function handleAgentClosed(msg: ServerMessage & { type: 'agentClosed' }, ctx: Ha
 
 function handleExistingAgents(msg: ServerMessage & { type: 'existingAgents' }, ctx: HandlerContext): void {
   const incoming = msg.agents
-  const meta = msg.agentMeta || ({} as Record<number, { palette?: number; hueShift?: number; seatId?: string; isExternal?: boolean; projectName?: string }>)
+  const meta = msg.agentMeta || ({} as Record<number, { palette?: number; hueShift?: number; seatId?: string; isExternal?: boolean; projectName?: string; isRemote?: boolean; owner?: string }>)
   const newProjects: Record<number, string> = {}
+  const newRemote: Record<number, { owner: string }> = {}
   for (const id of incoming) {
     const m = meta[id]
     if (m?.projectName) {
       newProjects[id] = m.projectName
+    }
+    if (m?.isRemote && m?.owner) {
+      newRemote[id] = { owner: m.owner }
+      ctx.os.setAgentRemote(id, true)
     }
     if (ctx.layoutReadyRef.current) {
       ctx.os.addAgent(id, m?.palette, m?.hueShift, m?.seatId, true)
@@ -181,6 +194,9 @@ function handleExistingAgents(msg: ServerMessage & { type: 'existingAgents' }, c
   }
   if (Object.keys(newProjects).length > 0) {
     ctx.setAgentProjects((prev) => ({ ...prev, ...newProjects }))
+  }
+  if (Object.keys(newRemote).length > 0) {
+    ctx.setRemoteAgents((prev) => ({ ...prev, ...newRemote }))
   }
   if (ctx.layoutReadyRef.current && incoming.length > 0) {
     saveAgentSeats(ctx.os)
@@ -438,6 +454,7 @@ function handleFloorSwitched(msg: ServerMessage & { type: 'floorSwitched' }, ctx
   ctx.setSubagentTools({})
   ctx.setSubagentCharacters([])
   ctx.setAgentProjects({})
+  ctx.setRemoteAgents({})
   ctx.setAgentTranscripts({})
   ctx.os.clearAllAgents()
   ctx.layoutReadyRef.current = false
@@ -499,6 +516,7 @@ export function useExtensionMessages(
   const [layoutReady, setLayoutReady] = useState(false)
   const [loadedAssets, setLoadedAssets] = useState<{ catalog: FurnitureAsset[]; sprites: Record<string, string[][]> } | undefined>()
   const [agentProjects, setAgentProjects] = useState<Record<number, string>>({})
+  const [remoteAgents, setRemoteAgents] = useState<Record<number, { owner: string }>>({})
   const [agentTranscripts, setAgentTranscripts] = useState<Record<number, TranscriptEntry[]>>({})
   const [excludedProjects, setExcludedProjects] = useState<string[]>([])
   const [projectDirs, setProjectDirs] = useState<{ name: string; excluded: boolean }[]>([])
@@ -526,6 +544,7 @@ export function useExtensionMessages(
       setLayoutReady,
       setLoadedAssets,
       setAgentProjects,
+      setRemoteAgents,
       setAgentTranscripts,
       setExcludedProjects,
       setProjectDirs,
@@ -547,5 +566,5 @@ export function useExtensionMessages(
     return unsub
   }, [getOfficeState])
 
-  return { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, agentTranscripts, excludedProjects, projectDirs, currentFloorId, building, floorSummaries }
+  return { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, remoteAgents, agentTranscripts, excludedProjects, projectDirs, currentFloorId, building, floorSummaries }
 }

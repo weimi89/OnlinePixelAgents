@@ -516,6 +516,11 @@ export class OfficeState {
     return this.subagentIdMap.get(`${parentAgentId}:${parentToolId}`) ?? null
   }
 
+  setAgentRemote(id: number, remote: boolean): void {
+    const ch = this.characters.get(id)
+    if (ch) ch.isRemote = remote
+  }
+
   setAgentDetached(id: number, detached: boolean): void {
     const ch = this.characters.get(id)
     if (ch) {

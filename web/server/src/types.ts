@@ -43,6 +43,12 @@ export interface AgentState {
 	transcriptLog: Array<{ ts: number; role: 'user' | 'assistant' | 'system'; summary: string }>;
 	/** 此代理所屬的樓層 */
 	floorId: FloorId;
+	/** 此代理是否來自遠端 Agent Node */
+	isRemote: boolean;
+	/** 遠端代理的擁有者使用者名稱 */
+	owner: string | null;
+	/** 遠端代理的來源 sessionId（用於 Agent Node 事件對應） */
+	remoteSessionId: string | null;
 }
 
 export interface PersistedAgent {
@@ -103,4 +109,6 @@ export interface AgentContext {
 	floorSender: (floorId: FloorId) => MessageSender;
 	/** 廣播各樓層代理數量摘要至所有客戶端 */
 	broadcastFloorSummaries: () => void;
+	/** remoteSessionId → agentId 的映射（供 Agent Node 事件快速查找） */
+	remoteAgentMap: Map<string, number>;
 }

@@ -126,7 +126,7 @@ function App() {
 
   const isEditDirty = useCallback(() => editor.isEditMode && editor.isDirty, [editor.isEditMode, editor.isDirty])
 
-  const { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, agentTranscripts, projectDirs, currentFloorId, building, floorSummaries } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
+  const { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, remoteAgents, agentTranscripts, projectDirs, currentFloorId, building, floorSummaries } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
 
   const [isDebugMode, setIsDebugMode] = useState(false)
   const [isBuildingViewOpen, setIsBuildingViewOpen] = useState(false)
@@ -436,6 +436,7 @@ function App() {
         panRef={editor.panRef}
         onCloseAgent={handleCloseAgent}
         agentProjects={agentProjects}
+        remoteAgents={remoteAgents}
         agentTranscripts={agentTranscripts}
       />
 

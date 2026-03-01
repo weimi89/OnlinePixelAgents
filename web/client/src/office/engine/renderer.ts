@@ -43,6 +43,8 @@ import {
   EMOTE_FADE_DURATION_SEC,
   SUBAGENT_GLOW_COLOR,
   SUBAGENT_GLOW_ALPHA,
+  REMOTE_AGENT_GLOW_COLOR,
+  REMOTE_AGENT_GLOW_ALPHA,
 } from '../../constants.js'
 
 // ── 渲染函式 ────────────────────────────────────────────
@@ -187,6 +189,23 @@ export function renderScene(
         draw: (c) => {
           c.save()
           c.globalAlpha = SUBAGENT_GLOW_ALPHA
+          c.drawImage(tinted, glowDrawX, glowDrawY)
+          c.restore()
+        },
+      })
+
+    // 遠端代理永久光暈（橘色輪廓）
+    } else if (ch.isRemote && !isSelected && !isHovered) {
+      const outlineData = getOutlineSprite(spriteData)
+      const outlineCached = getCachedSprite(outlineData, zoom)
+      const tinted = tintCanvas(outlineCached, REMOTE_AGENT_GLOW_COLOR)
+      const glowDrawX = drawX - zoom
+      const glowDrawY = drawY - zoom
+      drawables.push({
+        zY: charZY - OUTLINE_Z_SORT_OFFSET,
+        draw: (c) => {
+          c.save()
+          c.globalAlpha = REMOTE_AGENT_GLOW_ALPHA
           c.drawImage(tinted, glowDrawX, glowDrawY)
           c.restore()
         },

@@ -240,6 +240,8 @@ export interface Character {
   seatTimer: number
   /** 此角色是否代表子代理（由 Task 工具生成） */
   isSubagent: boolean
+  /** 此角色是否來自遠端 Agent Node */
+  isRemote: boolean
   /** 若為子代理，則為父代理 ID，否則為 null */
   parentAgentId: number | null
   /** 當前活躍的 Matrix 生成/消散特效，或 null */

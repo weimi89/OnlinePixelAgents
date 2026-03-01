@@ -160,6 +160,9 @@ function scanAndAdopt(
 			isDetached: false,
 			transcriptLog: [],
 			floorId,
+			isRemote: false,
+			owner: null,
+			remoteSessionId: null,
 		};
 		agents.set(id, agent);
 		ctx.trackedJsonlFiles.set(file, id);

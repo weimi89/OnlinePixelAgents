@@ -23,6 +23,8 @@ interface ToolOverlayProps {
   onCloseAgent: (id: number) => void
   /** agentId → projectName，僅外部專案代理有條目 */
   agentProjects: Record<number, string>
+  /** agentId → { owner }，僅遠端代理有條目 */
+  remoteAgents: Record<number, { owner: string }>
   /** agentId → 轉錄記錄陣列 */
   agentTranscripts: Record<number, TranscriptEntry[]>
 }
@@ -109,6 +111,7 @@ export function ToolOverlay({
   panRef,
   onCloseAgent,
   agentProjects,
+  remoteAgents,
   agentTranscripts,
 }: ToolOverlayProps) {
   useRenderTick()
@@ -179,7 +182,9 @@ export function ToolOverlay({
         // 取得模型顯示名稱與代理標籤
         const modelName = !isSub && agentModels[id] ? formatModelName(agentModels[id]) : null
         const projectName = !isSub ? agentProjects[id] : undefined
-        const agentLabel = projectName || (modelName ? `${modelName}` : t.agent(id))
+        const remoteInfo = !isSub ? remoteAgents[id] : undefined
+        const ownerPrefix = remoteInfo ? `@${remoteInfo.owner} ` : ''
+        const agentLabel = ownerPrefix + (projectName || (modelName ? `${modelName}` : t.agent(id)))
 
         // 決定圓點顏色
         const tools = agentTools[id]

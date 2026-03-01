@@ -153,6 +153,9 @@ function createAgentState(
 		isDetached,
 		transcriptLog: [],
 		floorId,
+		isRemote: false,
+		owner: null,
+		remoteSessionId: null,
 	};
 }
 
@@ -318,6 +321,9 @@ export function removeAgent(
 	cancelPermissionTimer(agentId, permissionTimers);
 
 	ctx.trackedJsonlFiles.delete(agent.jsonlFile);
+	if (agent.remoteSessionId) {
+		ctx.remoteAgentMap.delete(agent.remoteSessionId);
+	}
 	agents.delete(agentId);
 	persistAgents();
 }
@@ -482,7 +488,7 @@ export function sendExistingAgents(
 	agentIds.sort((a, b) => a - b);
 
 	// 為每個代理補充專案資訊
-	const enrichedMeta: Record<string, { palette?: number; hueShift?: number; seatId?: string; isExternal?: boolean; projectName?: string; floorId?: string }> = {};
+	const enrichedMeta: Record<string, { palette?: number; hueShift?: number; seatId?: string; isExternal?: boolean; projectName?: string; floorId?: string; isRemote?: boolean; owner?: string }> = {};
 	for (const [idStr, meta] of Object.entries(agentMeta)) {
 		enrichedMeta[idStr] = { ...meta };
 	}
@@ -496,6 +502,12 @@ export function sendExistingAgents(
 		const isExternal = agent.projectDir !== ownProjectDir;
 		if (isExternal) {
 			enrichedMeta[key].isExternal = true;
+		}
+		if (agent.isRemote) {
+			enrichedMeta[key].isRemote = true;
+			if (agent.owner) {
+				enrichedMeta[key].owner = agent.owner;
+			}
 		}
 	}
 

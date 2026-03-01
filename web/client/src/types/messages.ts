@@ -30,6 +30,8 @@ interface AgentMeta {
   isExternal?: boolean
   projectName?: string
   floorId?: string
+  isRemote?: boolean
+  owner?: string
 }
 
 /** 角色精靈圖方向資料 */
@@ -48,7 +50,7 @@ export interface FloorSummary {
 /** 伺服器 → 客戶端訊息的 discriminated union */
 export type ServerMessage =
   | { type: 'layoutLoaded'; layout: OfficeLayout | null }
-  | { type: 'agentCreated'; id: number; isExternal?: boolean; projectName?: string; floorId?: string }
+  | { type: 'agentCreated'; id: number; isExternal?: boolean; projectName?: string; floorId?: string; isRemote?: boolean; owner?: string }
   | { type: 'agentClosed'; id: number }
   | { type: 'existingAgents'; agents: number[]; agentMeta?: Record<number, AgentMeta> }
   | { type: 'agentToolStart'; id: number; toolId: string; status: string }

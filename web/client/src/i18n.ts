@@ -116,6 +116,10 @@ export const t = {
   removeFloor: '移除樓層',
   renameFloor: '重新命名',
 
+  // 遠端代理
+  remoteAgent: '遠端',
+  owner: '擁有者',
+
   // 大樓面板
   building: '大樓',
   buildingPanel: '大樓面板',

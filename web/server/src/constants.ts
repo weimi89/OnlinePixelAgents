@@ -7,9 +7,9 @@ export const TOOL_DONE_DELAY_MS = 300;
 export const PERMISSION_TIMER_DELAY_MS = 7000;
 export const TEXT_IDLE_DELAY_MS = 5000;
 
-// ── 顯示截斷 ──────────────────────────────────────
-export const BASH_COMMAND_DISPLAY_MAX_LENGTH = 30;
-export const TASK_DESCRIPTION_DISPLAY_MAX_LENGTH = 40;
+// ── 顯示截斷（已移至 pixel-agents-shared）────────────────────
+// BASH_COMMAND_DISPLAY_MAX_LENGTH、TASK_DESCRIPTION_DISPLAY_MAX_LENGTH
+// 請從 'pixel-agents-shared' 匯入
 
 // ── PNG / 素材解析 ─────────────────────────────────────
 export const PNG_ALPHA_THRESHOLD = 128;
@@ -54,6 +54,11 @@ export const TMUX_HEALTH_CHECK_INTERVAL_MS = 5000;
 
 // ── 轉錄記錄 ──────────────────────────────────────────────
 export const MAX_TRANSCRIPT_LOG = 15;
+
+// ── 認證 ──────────────────────────────────────────────────────
+export const AUTH_TOKEN_EXPIRY_DAYS = 30;
+export const JWT_SECRET_FILE_NAME = 'jwt-secret.key';
+export const USERS_FILE_NAME = 'users.json';
 
 // ── 伺服器 ──────────────────────────────────────────────────
 export const DEFAULT_PORT = 3000;

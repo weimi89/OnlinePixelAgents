@@ -33,6 +33,8 @@ import {
 	GRACEFUL_SHUTDOWN_TIMEOUT_MS,
 } from './constants.js';
 import { isDemoEnabled, startDemoMode, stopDemoMode } from './demoMode.js';
+import { initAuthRoutes } from './auth/routes.js';
+import { setupAgentNodeNamespace } from './agentNodeHandler.js';
 
 // ── 狀態 ────────────────────────────────────────────────────
 
@@ -137,6 +139,7 @@ const ctx: AgentContext = {
 	building,
 	floorSender: () => ({ postMessage() {} }), // 佔位，main() 中替換
 	broadcastFloorSummaries: () => {}, // 佔位，main() 中替換
+	remoteAgentMap: new Map(),
 };
 
 // ── tmux 健康檢查 ───────────────────────────────────────
@@ -200,11 +203,21 @@ async function main(): Promise<void> {
 		maxHttpBufferSize: 10 * 1024 * 1024, // 10MB，用於大型素材傳輸
 	});
 
+	// JSON body 解析（API 路由需要）
+	app.use(express.json());
+
+	// 認證路由
+	const authRouter = await initAuthRoutes();
+	app.use('/api/auth', authRouter);
+
 	// 提供客戶端靜態檔案（正式環境）
 	const clientDistPath = path.join(__dirname, '..', '..', 'client', 'dist');
 	if (fs.existsSync(clientDistPath)) {
 		app.use(express.static(clientDistPath));
 	}
+
+	// Agent Node namespace（遠端代理連線）
+	setupAgentNodeNamespace(io, ctx);
 
 	// 全域廣播 sender — 用於需要送達所有客戶端的訊息（如 projectNameUpdated）
 	ctx.sender = {
@@ -410,6 +423,12 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'closeAgent': {
+			// 遠端代理不可被瀏覽器關閉
+			const targetAgent = agents.get(msg.id);
+			if (targetAgent?.isRemote) {
+				console.log(`[Pixel Agents] Ignoring closeAgent for remote agent ${msg.id}`);
+				break;
+			}
 			closeAgent(msg.id, ctx);
 			break;
 		}
@@ -438,6 +457,7 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'resumeSession': {
+			// 遠端代理不適用 resumeSession
 			resumeSession(msg.sessionId, msg.projectDir, cwd, ctx);
 			break;
 		}

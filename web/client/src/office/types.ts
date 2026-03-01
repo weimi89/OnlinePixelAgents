@@ -34,6 +34,8 @@ export interface FloorColor {
   colorize?: boolean
 }
 
+export type DayPhase = 'dawn' | 'day' | 'dusk' | 'night'
+
 export const CharacterState = {
   IDLE: 'idle',
   WALK: 'walk',
@@ -45,6 +47,8 @@ export const CharacterState = {
   STRETCH: 'stretch',
   USE_WALL: 'use_wall',
   SLEEP: 'sleep',
+  MEETING: 'meeting',
+  ENTER_ELEVATOR: 'enter_elevator',
 } as const
 export type CharacterState = (typeof CharacterState)[keyof typeof CharacterState]
 
@@ -270,4 +274,8 @@ export interface Character {
   thinkForward: boolean
   /** 行為狀態倒數計時器（通用） */
   behaviorTimer: number
+  /** 會議桌家具 uid，若非會議中則為 null */
+  meetingTableUid: string | null
+  /** 跨樓層轉移目標，或 null */
+  transferTargetFloor: string | null
 }

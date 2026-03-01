@@ -32,6 +32,7 @@ interface AgentMeta {
   floorId?: string
   isRemote?: boolean
   owner?: string
+  fromElevator?: boolean
 }
 
 /** 角色精靈圖方向資料 */
@@ -47,10 +48,17 @@ export interface FloorSummary {
   agentCount: number
 }
 
+/** 儀表板資料 */
+export interface DashboardPayload {
+  floors: Array<{ id: string; name: string; order: number; agentCount: number; activeCount: number }>
+  agents: Array<{ id: number; projectName: string; floorId: string; floorName: string; isActive: boolean; model: string; isRemote: boolean; owner: string; activeToolName: string; toolCount: number }>
+  stats: { totalAgents: number; activeAgents: number; totalToolCalls: number; toolDistribution: Record<string, number> }
+}
+
 /** 伺服器 → 客戶端訊息的 discriminated union */
 export type ServerMessage =
   | { type: 'layoutLoaded'; layout: OfficeLayout | null }
-  | { type: 'agentCreated'; id: number; isExternal?: boolean; projectName?: string; floorId?: string; isRemote?: boolean; owner?: string }
+  | { type: 'agentCreated'; id: number; isExternal?: boolean; projectName?: string; floorId?: string; isRemote?: boolean; owner?: string; fromElevator?: boolean }
   | { type: 'agentClosed'; id: number }
   | { type: 'existingAgents'; agents: number[]; agentMeta?: Record<number, AgentMeta> }
   | { type: 'agentToolStart'; id: number; toolId: string; status: string }
@@ -82,3 +90,7 @@ export type ServerMessage =
   | { type: 'buildingConfig'; building: BuildingConfig }
   | { type: 'floorSwitched'; floorId: string }
   | { type: 'floorSummaries'; summaries: FloorSummary[] }
+  | { type: 'chatMessage'; nickname: string; text: string; ts: number }
+  | { type: 'chatHistory'; messages: Array<{ nickname: string; text: string; ts: number }> }
+  | { type: 'agentFloorTransfer'; id: number; targetFloorId: string }
+  | { type: 'dashboardData'; data: DashboardPayload }

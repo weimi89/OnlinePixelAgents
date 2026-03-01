@@ -15,6 +15,10 @@ interface BottomToolbarProps {
   onSwitchFloor: (floorId: string) => void
   isBuildingViewOpen: boolean
   onToggleBuildingView: () => void
+  dayNightEnabled: boolean
+  onToggleDayNight: () => void
+  dayNightTimeOverride: number | null
+  onDayNightTimeOverrideChange: (hour: number | null) => void
 }
 
 const panelStyle: React.CSSProperties = {
@@ -60,6 +64,10 @@ export const BottomToolbar = memo(function BottomToolbar({
   onSwitchFloor,
   isBuildingViewOpen,
   onToggleBuildingView,
+  dayNightEnabled,
+  onToggleDayNight,
+  dayNightTimeOverride,
+  onDayNightTimeOverrideChange,
 }: BottomToolbarProps) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -135,6 +143,10 @@ export const BottomToolbar = memo(function BottomToolbar({
           onClose={() => setIsSettingsOpen(false)}
           isDebugMode={isDebugMode}
           onToggleDebugMode={onToggleDebugMode}
+          dayNightEnabled={dayNightEnabled}
+          onToggleDayNight={onToggleDayNight}
+          dayNightTimeOverride={dayNightTimeOverride}
+          onDayNightTimeOverrideChange={onDayNightTimeOverrideChange}
         />
       </div>
       {!isBuildingViewOpen && (

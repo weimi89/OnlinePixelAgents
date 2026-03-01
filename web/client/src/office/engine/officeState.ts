@@ -1,5 +1,5 @@
 import { TILE_SIZE, MATRIX_EFFECT_DURATION, CharacterState, Direction } from '../types.js'
-import type { EmoteType } from '../types.js'
+import type { EmoteType, DayPhase } from '../types.js'
 import {
   PALETTE_COUNT,
   HUE_SHIFT_MIN_DEG,
@@ -49,6 +49,10 @@ export class OfficeState {
   /** 反向查找：子代理角色 ID → 父代理資訊 */
   subagentMeta: Map<number, { parentAgentId: number; parentToolId: string }> = new Map()
   private nextSubagentId = -1
+  /** 當前日夜階段 */
+  dayPhase: DayPhase = 'day'
+  /** 前一次的日夜階段（偵測變化以重建家具） */
+  private prevDayPhase: DayPhase = 'day'
 
   constructor(layout?: OfficeLayout) {
     this.layout = layout || createDefaultLayout()
@@ -257,6 +261,27 @@ export class OfficeState {
       ch.matrixEffectTimer = 0
       ch.matrixEffectSeeds = matrixEffectSeeds()
     }
+    this.characters.set(id, ch)
+  }
+
+  /** 在指定位置生成代理（用於電梯到達） */
+  addAgentAtPosition(id: number, col: number, row: number): void {
+    if (this.characters.has(id)) return
+    const pick = this.pickDiversePalette()
+    const seatId = this.findFreeSeat()
+    const ch = createCharacter(id, pick.palette, seatId, seatId ? this.seats.get(seatId)! : null, pick.hueShift)
+    if (seatId) {
+      const seat = this.seats.get(seatId)!
+      seat.assigned = true
+    }
+    // 覆蓋位置至指定格
+    ch.x = col * TILE_SIZE + TILE_SIZE / 2
+    ch.y = row * TILE_SIZE + TILE_SIZE / 2
+    ch.tileCol = col
+    ch.tileRow = row
+    ch.matrixEffect = 'spawn'
+    ch.matrixEffectTimer = 0
+    ch.matrixEffectSeeds = matrixEffectSeeds()
     this.characters.set(id, ch)
   }
 
@@ -584,6 +609,23 @@ export class OfficeState {
       }
     }
 
+    // 夜間：所有 LAMP / DESK_LAMP 類家具自動亮起
+    const lampsOn = this.dayPhase === 'dusk' || this.dayPhase === 'night'
+    if (lampsOn) {
+      for (const item of this.layout.furniture) {
+        const entry = getCatalogEntry(item.type)
+        if (!entry) continue
+        // 匹配 lamp 類型家具
+        if (item.type.toLowerCase().includes('lamp')) {
+          for (let dr = 0; dr < entry.footprintH; dr++) {
+            for (let dc = 0; dc < entry.footprintW; dc++) {
+              autoOnTiles.add(`${item.col + dc},${item.row + dr}`)
+            }
+          }
+        }
+      }
+    }
+
     if (autoOnTiles.size === 0) {
       this.furniture = layoutToFurnitureInstances(this.layout.furniture)
       return
@@ -685,6 +727,49 @@ export class OfficeState {
     if (ch.emoteType && ch.emoteTimer > 1.0) return
     ch.emoteType = emote
     ch.emoteTimer = EMOTE_DISPLAY_DURATION_SEC
+  }
+
+  /** 更新日夜階段並在變化時重建家具 */
+  setDayPhase(phase: DayPhase): void {
+    this.dayPhase = phase
+    if (phase !== this.prevDayPhase) {
+      this.prevDayPhase = phase
+      this.furnitureDirty = true
+    }
+  }
+
+  /** 掃描佈局中的電梯家具，回傳第一個找到的位置 */
+  findElevatorPosition(): { col: number; row: number } | null {
+    for (const item of this.layout.furniture) {
+      if (item.type.toLowerCase().includes('elevator') || item.type.toLowerCase().includes('door')) {
+        return { col: item.col, row: item.row }
+      }
+    }
+    return null
+  }
+
+  /** 觸發代理的跨樓層轉移動畫 */
+  startFloorTransfer(agentId: number): void {
+    const ch = this.characters.get(agentId)
+    if (!ch) return
+    const elevatorPos = this.findElevatorPosition()
+    if (elevatorPos) {
+      // 有電梯/門 → 先走過去再消散
+      const path = this.withOwnSeatUnblocked(ch, () =>
+        findPath(ch.tileCol, ch.tileRow, elevatorPos.col, elevatorPos.row, this.tileMap, this.blockedTiles)
+      )
+      if (path.length > 0) {
+        ch.state = CharacterState.ENTER_ELEVATOR
+        ch.transferTargetFloor = 'transferring'
+        ch.path = path
+        ch.moveProgress = 0
+        ch.frame = 0
+        ch.frameTimer = 0
+        return
+      }
+    }
+    // 無電梯或找不到路徑 → 直接消散
+    this.removeAgent(agentId)
   }
 
   update(dt: number): void {

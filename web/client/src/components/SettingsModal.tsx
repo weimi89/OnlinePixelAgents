@@ -8,6 +8,10 @@ interface SettingsModalProps {
   onClose: () => void
   isDebugMode: boolean
   onToggleDebugMode: () => void
+  dayNightEnabled: boolean
+  onToggleDayNight: () => void
+  dayNightTimeOverride: number | null
+  onDayNightTimeOverrideChange: (hour: number | null) => void
 }
 
 const menuItemBase: React.CSSProperties = {
@@ -25,7 +29,7 @@ const menuItemBase: React.CSSProperties = {
   textAlign: 'left',
 }
 
-export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode }: SettingsModalProps) {
+export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode, dayNightEnabled, onToggleDayNight, dayNightTimeOverride, onDayNightTimeOverrideChange }: SettingsModalProps) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [soundLocal, setSoundLocal] = useState(isSoundEnabled)
   const importInputRef = useRef<HTMLInputElement>(null)
@@ -222,6 +226,89 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
           >
             {soundLocal ? 'X' : ''}
           </span>
+        </button>
+        <button
+          onClick={onToggleDayNight}
+          onMouseEnter={() => setHovered('daynight')}
+          onMouseLeave={() => setHovered(null)}
+          style={{
+            ...menuItemBase,
+            background: hovered === 'daynight' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+          }}
+        >
+          <span>{t.dayNightCycle}</span>
+          <span
+            style={{
+              width: 14,
+              height: 14,
+              border: '2px solid rgba(255, 255, 255, 0.5)',
+              borderRadius: 0,
+              background: dayNightEnabled ? 'rgba(90, 140, 255, 0.8)' : 'transparent',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '12px',
+              lineHeight: 1,
+              color: '#fff',
+            }}
+          >
+            {dayNightEnabled ? 'X' : ''}
+          </span>
+        </button>
+        {dayNightEnabled && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '4px 10px',
+            }}
+          >
+            <span style={{ fontSize: '20px', color: 'rgba(255, 255, 255, 0.6)', whiteSpace: 'nowrap' }}>
+              {t.timeOverride}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={23}
+              value={dayNightTimeOverride ?? new Date().getHours()}
+              onChange={(e) => onDayNightTimeOverrideChange(Number(e.target.value))}
+              style={{ flex: 1, accentColor: 'var(--pixel-accent)' }}
+            />
+            <span style={{ fontSize: '20px', color: 'rgba(255, 255, 255, 0.8)', minWidth: 30, textAlign: 'right' }}>
+              {dayNightTimeOverride !== null ? `${dayNightTimeOverride}:00` : t.useRealTime}
+            </span>
+            {dayNightTimeOverride !== null && (
+              <button
+                onClick={() => onDayNightTimeOverrideChange(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  cursor: 'pointer',
+                  fontSize: '20px',
+                  padding: '0 4px',
+                }}
+              >
+                X
+              </button>
+            )}
+          </div>
+        )}
+        <button
+          onClick={() => {
+            window.open(`${window.location.origin}${window.location.pathname}#/dashboard`, '_blank')
+            onClose()
+          }}
+          onMouseEnter={() => setHovered('dashboard')}
+          onMouseLeave={() => setHovered(null)}
+          style={{
+            ...menuItemBase,
+            background: hovered === 'dashboard' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+          }}
+        >
+          {t.openDashboard}
         </button>
         <button
           onClick={onToggleDebugMode}

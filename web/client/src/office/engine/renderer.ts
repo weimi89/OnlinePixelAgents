@@ -627,6 +627,7 @@ export function renderFrame(
   tileColors?: Array<FloorColor | null>,
   layoutCols?: number,
   layoutRows?: number,
+  dayNightOverlay?: { color: string; alpha: number },
 ): { offsetX: number; offsetY: number } {
   // 清除
   ctx.clearRect(0, 0, canvasWidth, canvasHeight)
@@ -667,6 +668,14 @@ export function renderFrame(
 
   // 表情圖標（在氣泡旁邊）
   renderEmotes(ctx, characters, offsetX, offsetY, zoom)
+
+  // 日夜色溫覆蓋層（在角色/家具之上，編輯器覆蓋層之前）
+  if (dayNightOverlay && dayNightOverlay.alpha > 0) {
+    ctx.save()
+    ctx.fillStyle = dayNightOverlay.color
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+    ctx.restore()
+  }
 
   // 編輯器覆蓋層
   if (editor) {

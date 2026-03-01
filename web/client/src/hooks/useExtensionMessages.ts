@@ -70,6 +70,8 @@ export interface ExtensionMessageState {
   building: BuildingConfig | null
   /** 各樓層代理數量摘要（floorId → agentCount） */
   floorSummaries: Record<string, number>
+  /** 聊天訊息 */
+  chatMessages: Array<{ nickname: string; text: string; ts: number }>
 }
 
 /** 轉錄記錄條目 */
@@ -113,6 +115,7 @@ interface HandlerContext {
   setCurrentFloorId: React.Dispatch<React.SetStateAction<string | null>>
   setBuilding: React.Dispatch<React.SetStateAction<BuildingConfig | null>>
   setFloorSummaries: React.Dispatch<React.SetStateAction<Record<string, number>>>
+  setChatMessages: React.Dispatch<React.SetStateAction<Array<{ nickname: string; text: string; ts: number }>>>
 }
 
 // ── Message Handlers ───────────────────────────────────────────
@@ -152,7 +155,17 @@ function handleAgentCreated(msg: ServerMessage & { type: 'agentCreated' }, ctx: 
     ctx.setRemoteAgents((prev) => ({ ...prev, [id]: { owner: msg.owner! } }))
     ctx.os.setAgentRemote(id, true)
   }
-  ctx.os.addAgent(id)
+  if (msg.fromElevator) {
+    // 從電梯位置生成（若有電梯）
+    const elevPos = ctx.os.findElevatorPosition()
+    if (elevPos) {
+      ctx.os.addAgentAtPosition(id, elevPos.col, elevPos.row)
+    } else {
+      ctx.os.addAgent(id)
+    }
+  } else {
+    ctx.os.addAgent(id)
+  }
   saveAgentSeats(ctx.os)
 }
 
@@ -444,6 +457,32 @@ function handleFloorSummaries(msg: ServerMessage & { type: 'floorSummaries' }, c
   ctx.setFloorSummaries(map)
 }
 
+function handleAgentFloorTransfer(msg: ServerMessage & { type: 'agentFloorTransfer' }, ctx: HandlerContext): void {
+  const { id } = msg
+  // 觸發代理離開動畫（走向電梯 → 消散）
+  ctx.os.startFloorTransfer(id)
+  // 從 UI 狀態中移除代理（角色的視覺消散由 officeState 處理）
+  ctx.setAgents((prev) => prev.filter((a) => a !== id))
+  ctx.setAgentTools((prev) => removeKey(prev, id))
+  ctx.setAgentStatuses((prev) => removeKey(prev, id))
+  ctx.setAgentModels((prev) => removeKey(prev, id))
+  ctx.setAgentProjects((prev) => removeKey(prev, id))
+  ctx.setRemoteAgents((prev) => removeKey(prev, id))
+  ctx.setSubagentTools((prev) => removeKey(prev, id))
+  ctx.setAgentTranscripts((prev) => removeKey(prev, id))
+  ctx.os.removeAllSubagents(id)
+  ctx.setSubagentCharacters((prev) => prev.filter((s) => s.parentAgentId !== id))
+}
+
+function handleChatMessage(msg: ServerMessage & { type: 'chatMessage' }, ctx: HandlerContext): void {
+  const { nickname, text, ts } = msg
+  ctx.setChatMessages((prev) => [...prev, { nickname, text, ts }])
+}
+
+function handleChatHistory(msg: ServerMessage & { type: 'chatHistory' }, ctx: HandlerContext): void {
+  ctx.setChatMessages(msg.messages)
+}
+
 function handleFloorSwitched(msg: ServerMessage & { type: 'floorSwitched' }, ctx: HandlerContext): void {
   ctx.setCurrentFloorId(msg.floorId)
   // 清空當前代理相關狀態，新樓層的資料會隨 existingAgents + layoutLoaded 到來
@@ -459,6 +498,7 @@ function handleFloorSwitched(msg: ServerMessage & { type: 'floorSwitched' }, ctx
   ctx.os.clearAllAgents()
   ctx.layoutReadyRef.current = false
   ctx.setLayoutReady(false)
+  ctx.setChatMessages([])
 }
 
 // ── Handler 查找表 ──────────────────────────────────────────────
@@ -497,6 +537,9 @@ const messageHandlers: Record<string, HandlerFn> = {
   buildingConfig: handleBuildingConfig as HandlerFn,
   floorSwitched: handleFloorSwitched as HandlerFn,
   floorSummaries: handleFloorSummaries as HandlerFn,
+  chatMessage: handleChatMessage as HandlerFn,
+  chatHistory: handleChatHistory as HandlerFn,
+  agentFloorTransfer: handleAgentFloorTransfer as HandlerFn,
 }
 
 // ── Hook ────────────────────────────────────────────────────────
@@ -523,6 +566,7 @@ export function useExtensionMessages(
   const [currentFloorId, setCurrentFloorId] = useState<string | null>(null)
   const [building, setBuilding] = useState<BuildingConfig | null>(null)
   const [floorSummaries, setFloorSummaries] = useState<Record<string, number>>({})
+  const [chatMessages, setChatMessages] = useState<Array<{ nickname: string; text: string; ts: number }>>([])
 
   const layoutReadyRef = useRef(false)
   const pendingAgentsRef = useRef<Array<{ id: number; palette?: number; hueShift?: number; seatId?: string }>>([])
@@ -551,6 +595,7 @@ export function useExtensionMessages(
       setCurrentFloorId,
       setBuilding,
       setFloorSummaries,
+      setChatMessages,
     }
 
     const handler = (data: unknown) => {
@@ -566,5 +611,5 @@ export function useExtensionMessages(
     return unsub
   }, [getOfficeState])
 
-  return { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, remoteAgents, agentTranscripts, excludedProjects, projectDirs, currentFloorId, building, floorSummaries }
+  return { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, remoteAgents, agentTranscripts, excludedProjects, projectDirs, currentFloorId, building, floorSummaries, chatMessages }
 }

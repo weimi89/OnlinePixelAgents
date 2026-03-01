@@ -60,6 +60,11 @@ export const AUTH_TOKEN_EXPIRY_DAYS = 30;
 export const JWT_SECRET_FILE_NAME = 'jwt-secret.key';
 export const USERS_FILE_NAME = 'users.json';
 
+// ── 聊天 ──────────────────────────────────────────────────────
+export const CHAT_MESSAGE_MAX_LENGTH = 100;
+export const CHAT_RATE_LIMIT_MS = 500;
+export const CHAT_HISTORY_MAX = 50;
+
 // ── 伺服器 ──────────────────────────────────────────────────
 export const DEFAULT_PORT = 3000;
 export const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 5000; // 強制退出前的寬限時間

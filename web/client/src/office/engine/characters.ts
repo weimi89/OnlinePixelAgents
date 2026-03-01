@@ -30,8 +30,13 @@ import {
   WANDER_WEIGHT_FURNITURE,
   WANDER_WEIGHT_CHAT,
   WANDER_WEIGHT_WALL,
+  WANDER_WEIGHT_MEETING,
   WANDER_RANDOM_RADIUS,
   WANDER_MAX_PATH_STEPS,
+  MEETING_MIN_PARTICIPANTS,
+  MEETING_DURATION_MIN_SEC,
+  MEETING_DURATION_MAX_SEC,
+  MEETING_SEAT_SEARCH_RADIUS,
 } from '../../constants.js'
 
 /** 顯示閱讀動畫而非打字動畫的工具 */
@@ -44,7 +49,7 @@ export function isReadingTool(tool: string | null): boolean {
 
 /** 判斷狀態是否需要坐姿偏移（在椅子上的狀態） */
 export function isSittingState(state: CharacterState): boolean {
-  return state === CharacterState.TYPE || state === CharacterState.SLEEP
+  return state === CharacterState.TYPE || state === CharacterState.SLEEP || state === CharacterState.MEETING
 }
 
 /** 可互動的家具類型 */
@@ -149,6 +154,8 @@ export function createCharacter(
     thinkPath: [],
     thinkForward: true,
     behaviorTimer: 0,
+    meetingTableUid: null,
+    transferTargetFloor: null,
   }
 }
 
@@ -163,7 +170,7 @@ function truncatePath(path: Array<{ col: number; row: number }>): Array<{ col: n
   return path.slice(0, WANDER_MAX_PATH_STEPS)
 }
 
-type WanderActionType = 'idle_look' | 'random' | 'furniture' | 'chat' | 'wall'
+type WanderActionType = 'idle_look' | 'random' | 'furniture' | 'chat' | 'wall' | 'meeting'
 
 /** 加權隨機漫遊目標選擇 */
 function pickWanderAction(
@@ -224,6 +231,32 @@ function pickWanderAction(
   }
   if (closestWall) {
     weights.push({ type: 'wall', weight: WANDER_WEIGHT_WALL, target: { col: closestWall.col, row: closestWall.row }, furnitureType: closestWall.type })
+  }
+
+  // 會議桌 — 附近有足夠的非活躍角色時加入
+  if (!ch.isSubagent) {
+    let closestMeeting: { col: number; row: number; type: string } | null = null
+    let closestMeetingDist = Infinity
+    for (const [, f] of ctx.furnitureMap) {
+      if (f.type !== 'meeting_table') continue
+      const d = manhattan(ch.tileCol, ch.tileRow, f.col, f.row)
+      if (d <= 10 && d < closestMeetingDist) {
+        closestMeetingDist = d
+        closestMeeting = f
+      }
+    }
+    if (closestMeeting) {
+      // 檢查附近是否有足夠的非活躍、非子代理角色
+      let nearbyIdle = 0
+      for (const [otherId, other] of ctx.allCharacters) {
+        if (otherId === ch.id || other.isSubagent || other.isActive) continue
+        const d = manhattan(closestMeeting.col, closestMeeting.row, other.tileCol, other.tileRow)
+        if (d <= 8) nearbyIdle++
+      }
+      if (nearbyIdle >= MEETING_MIN_PARTICIPANTS - 1) {
+        weights.push({ type: 'meeting', weight: WANDER_WEIGHT_MEETING, target: { col: closestMeeting.col, row: closestMeeting.row }, furnitureType: closestMeeting.type })
+      }
+    }
   }
 
   // 加權隨機選擇（return_seat 已在 IDLE 狀態中確定性處理）
@@ -502,6 +535,28 @@ export function updateCharacter(
               acted = true
             }
           }
+        } else if (action.type === 'meeting' && action.target) {
+          // 走向會議桌旁的空閒格
+          const adj = findMeetingSpot(action.target.col, action.target.row, ctx.tileMap, ctx.blockedTiles, ctx.allCharacters, ch.id)
+          if (adj) {
+            if (ch.tileCol === adj.col && ch.tileRow === adj.row) {
+              // 已經在會議桌旁 → 直接進入會議
+              startMeeting(ch, action.target, ctx.allCharacters, ctx.tileMap, ctx.blockedTiles)
+              acted = true
+            } else {
+              const rawPath = findPath(ch.tileCol, ch.tileRow, adj.col, adj.row, ctx.tileMap, ctx.blockedTiles)
+              if (rawPath.length > 0) {
+                ch.path = truncatePath(rawPath)
+                ch.moveProgress = 0
+                ch.state = CharacterState.WALK
+                ch.frame = 0
+                ch.frameTimer = 0
+                ch.meetingTableUid = `${action.target.col},${action.target.row}`
+                ch.wanderCount++
+                acted = true
+              }
+            }
+          }
         } else {
           // 隨機漫遊 — 限制在附近幾格，優先走近處
           const nearby = ctx.walkableTiles.filter(
@@ -598,6 +653,23 @@ export function updateCharacter(
               }
             }
             ch.interactTarget = null
+          }
+
+          // 檢查是否正在前往會議桌
+          if (ch.meetingTableUid) {
+            const [mtc, mtr] = ch.meetingTableUid.split(',').map(Number)
+            const d = manhattan(ch.tileCol, ch.tileRow, mtc, mtr)
+            if (d <= MEETING_SEAT_SEARCH_RADIUS) {
+              const duration = randomRange(MEETING_DURATION_MIN_SEC, MEETING_DURATION_MAX_SEC)
+              ch.state = CharacterState.MEETING
+              ch.behaviorTimer = duration
+              ch.dir = directionBetween(ch.tileCol, ch.tileRow, mtc, mtr)
+              ch.frame = 0
+              ch.frameTimer = 0
+              setEmote(ch, EmoteType.NOTE, 3)
+              break
+            }
+            ch.meetingTableUid = null
           }
 
           // 到達座位旁 — 檢查是否有附近的聊天對象
@@ -874,6 +946,65 @@ export function updateCharacter(
       }
       break
     }
+
+    case CharacterState.MEETING: {
+      // 會議動畫（使用 read 幀）
+      if (ch.frameTimer >= TYPE_FRAME_DURATION_SEC) {
+        ch.frameTimer -= TYPE_FRAME_DURATION_SEC
+        ch.frame = (ch.frame + 1) % 2
+      }
+      ch.behaviorTimer -= dt
+      // 定期顯示表情
+      if (!ch.emoteType && Math.random() < 0.02) {
+        setEmote(ch, Math.random() < 0.5 ? EmoteType.NOTE : EmoteType.IDEA)
+      }
+      // 會議結束或代理活躍
+      if (ch.behaviorTimer <= 0 || ch.isActive) {
+        ch.state = CharacterState.IDLE
+        ch.meetingTableUid = null
+        ch.frame = 0
+        ch.frameTimer = 0
+        ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC)
+        setEmote(ch, EmoteType.STAR)
+      }
+      break
+    }
+
+    case CharacterState.ENTER_ELEVATOR: {
+      // 走向電梯的步行動畫
+      if (ch.frameTimer >= WALK_FRAME_DURATION_SEC) {
+        ch.frameTimer -= WALK_FRAME_DURATION_SEC
+        ch.frame = (ch.frame + 1) % 4
+      }
+      if (ch.path.length === 0) {
+        // 到達電梯位置 → 觸發消散（由 officeState 的 matrix 特效處理）
+        ch.transferTargetFloor = 'despawning'
+        // 標記為消散 — officeState.update() 會在 matrixEffect 完成後移除
+        ch.matrixEffect = 'despawn'
+        ch.matrixEffectTimer = 0
+        ch.matrixEffectSeeds = Array.from({ length: 16 }, () => Math.random())
+        ch.bubbleType = null
+        break
+      }
+      // 朝路徑中的下一格移動
+      const elevNext = ch.path[0]
+      ch.dir = directionBetween(ch.tileCol, ch.tileRow, elevNext.col, elevNext.row)
+      ch.moveProgress += (WALK_SPEED_PX_PER_SEC / TILE_SIZE) * dt
+      const elevFrom = tileCenter(ch.tileCol, ch.tileRow)
+      const elevTo = tileCenter(elevNext.col, elevNext.row)
+      const elevP = Math.min(ch.moveProgress, 1)
+      ch.x = elevFrom.x + (elevTo.x - elevFrom.x) * elevP
+      ch.y = elevFrom.y + (elevTo.y - elevFrom.y) * elevP
+      if (ch.moveProgress >= 1) {
+        ch.tileCol = elevNext.col
+        ch.tileRow = elevNext.row
+        ch.x = elevTo.x
+        ch.y = elevTo.y
+        ch.path.shift()
+        ch.moveProgress = 0
+      }
+      break
+    }
   }
 }
 
@@ -912,6 +1043,92 @@ function endChat(ch: Character, allCharacters: Map<number, Character>): void {
   ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC)
 }
 
+/** 找到會議桌旁的可用座位（考慮其他角色佔用） */
+function findMeetingSpot(
+  tableCol: number,
+  tableRow: number,
+  tileMap: TileTypeVal[][],
+  blockedTiles: Set<string>,
+  allCharacters: Map<number, Character>,
+  selfId: number,
+): { col: number; row: number } | null {
+  const rows = tileMap.length
+  const cols = rows > 0 ? tileMap[0].length : 0
+  const occupiedTiles = new Set<string>()
+  for (const [cid, c] of allCharacters) {
+    if (cid === selfId) continue
+    occupiedTiles.add(`${c.tileCol},${c.tileRow}`)
+  }
+  // 搜索半徑內的可用格
+  const candidates: Array<{ col: number; row: number; dist: number }> = []
+  for (let dr = -MEETING_SEAT_SEARCH_RADIUS; dr <= MEETING_SEAT_SEARCH_RADIUS; dr++) {
+    for (let dc = -MEETING_SEAT_SEARCH_RADIUS; dc <= MEETING_SEAT_SEARCH_RADIUS; dc++) {
+      if (dr === 0 && dc === 0) continue
+      const c = tableCol + dc
+      const r = tableRow + dr
+      if (c < 0 || c >= cols || r < 0 || r >= rows) continue
+      const tile = tileMap[r]?.[c]
+      if (tile === undefined || tile === 0 || tile === 8) continue
+      const key = `${c},${r}`
+      if (blockedTiles.has(key) || occupiedTiles.has(key)) continue
+      candidates.push({ col: c, row: r, dist: Math.abs(dc) + Math.abs(dr) })
+    }
+  }
+  if (candidates.length === 0) return null
+  candidates.sort((a, b) => a.dist - b.dist)
+  return candidates[0]
+}
+
+/** 開始會議 — 通知附近的閒置角色也加入 */
+function startMeeting(
+  initiator: Character,
+  tablePos: { col: number; row: number },
+  allCharacters: Map<number, Character>,
+  tileMap: TileTypeVal[][],
+  blockedTiles: Set<string>,
+): void {
+  const duration = randomRange(MEETING_DURATION_MIN_SEC, MEETING_DURATION_MAX_SEC)
+  initiator.state = CharacterState.MEETING
+  initiator.meetingTableUid = `${tablePos.col},${tablePos.row}`
+  initiator.behaviorTimer = duration
+  initiator.dir = directionBetween(initiator.tileCol, initiator.tileRow, tablePos.col, tablePos.row)
+  initiator.frame = 0
+  initiator.frameTimer = 0
+  setEmote(initiator, EmoteType.NOTE, 3)
+
+  // 邀請附近的閒置角色加入
+  for (const [otherId, other] of allCharacters) {
+    if (otherId === initiator.id || other.isSubagent || other.isActive) continue
+    if (other.state !== CharacterState.IDLE) continue
+    const d = manhattan(tablePos.col, tablePos.row, other.tileCol, other.tileRow)
+    if (d <= 8) {
+      const spot = findMeetingSpot(tablePos.col, tablePos.row, tileMap, blockedTiles, allCharacters, otherId)
+      if (spot) {
+        if (other.tileCol === spot.col && other.tileRow === spot.row) {
+          other.state = CharacterState.MEETING
+          other.meetingTableUid = `${tablePos.col},${tablePos.row}`
+          other.behaviorTimer = duration
+          other.dir = directionBetween(other.tileCol, other.tileRow, tablePos.col, tablePos.row)
+          other.frame = 0
+          other.frameTimer = 0
+          setEmote(other, EmoteType.NOTE, 3)
+        } else {
+          // 走向會議桌
+          other.meetingTableUid = `${tablePos.col},${tablePos.row}`
+          const path = findPath(other.tileCol, other.tileRow, spot.col, spot.row, tileMap, blockedTiles)
+          if (path.length > 0) {
+            other.path = truncatePath(path)
+            other.moveProgress = 0
+            other.state = CharacterState.WALK
+            other.frame = 0
+            other.frameTimer = 0
+          }
+        }
+      }
+    }
+  }
+}
+
 /** 取得角色當前狀態和方向對應的精靈圖幀 */
 export function getCharacterSprite(ch: Character, sprites: CharacterSprites): SpriteData {
   switch (ch.state) {
@@ -941,6 +1158,10 @@ export function getCharacterSprite(ch: Character, sprites: CharacterSprites): Sp
       return sprites.walk[ch.dir][ch.frame % 4]
     case CharacterState.SLEEP:
       return sprites.typing[ch.dir][ch.frame % 2]
+    case CharacterState.MEETING:
+      return sprites.reading[ch.dir][ch.frame % 2]
+    case CharacterState.ENTER_ELEVATOR:
+      return sprites.walk[ch.dir][ch.frame % 4]
     default:
       return sprites.walk[ch.dir][1]
   }

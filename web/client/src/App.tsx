@@ -16,6 +16,7 @@ import { DebugView } from './components/DebugView.js'
 import { AgentLabels } from './components/AgentLabels.js'
 import { SessionPicker } from './components/SessionPicker.js'
 import { BuildingView } from './components/BuildingView.js'
+import { ChatPanel } from './components/ChatPanel.js'
 import type { SessionInfo } from './components/SessionPicker.js'
 import type { ServerMessage } from './types/messages.js'
 import { t } from './i18n.js'
@@ -126,10 +127,12 @@ function App() {
 
   const isEditDirty = useCallback(() => editor.isEditMode && editor.isDirty, [editor.isEditMode, editor.isDirty])
 
-  const { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, remoteAgents, agentTranscripts, projectDirs, currentFloorId, building, floorSummaries } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
+  const { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, remoteAgents, agentTranscripts, projectDirs, currentFloorId, building, floorSummaries, chatMessages } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
 
   const [isDebugMode, setIsDebugMode] = useState(false)
   const [isBuildingViewOpen, setIsBuildingViewOpen] = useState(false)
+  const [dayNightEnabled, setDayNightEnabled] = useState(true)
+  const [dayNightTimeOverride, setDayNightTimeOverride] = useState<number | null>(null)
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false)
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [isLoadingSessions, setIsLoadingSessions] = useState(false)
@@ -280,6 +283,8 @@ function App() {
           zoom={editor.zoom}
           onZoomChange={editor.handleZoomChange}
           panRef={editor.panRef}
+          dayNightEnabled={dayNightEnabled}
+          dayNightTimeOverride={dayNightTimeOverride}
         />
       </div>
 
@@ -340,6 +345,10 @@ function App() {
         onSwitchFloor={handleSwitchFloor}
         isBuildingViewOpen={isBuildingViewOpen}
         onToggleBuildingView={handleToggleBuildingView}
+        dayNightEnabled={dayNightEnabled}
+        onToggleDayNight={useCallback(() => setDayNightEnabled((v) => !v), [])}
+        dayNightTimeOverride={dayNightTimeOverride}
+        onDayNightTimeOverrideChange={useCallback((h: number | null) => setDayNightTimeOverride(h), [])}
       />
 
       <SessionPicker
@@ -361,6 +370,8 @@ function App() {
         floorSummaries={floorSummaries}
         onSwitchFloor={handleSwitchFloor}
       />
+
+      <ChatPanel messages={chatMessages} />
 
       {editor.isEditMode && editor.isDirty && (
         <EditActionBar editor={editor} editorState={editorState} />

@@ -31,10 +31,14 @@ import {
 	AGENT_SEATS_FILE_NAME,
 	TMUX_HEALTH_CHECK_INTERVAL_MS,
 	GRACEFUL_SHUTDOWN_TIMEOUT_MS,
+	CHAT_MESSAGE_MAX_LENGTH,
+	CHAT_RATE_LIMIT_MS,
+	CHAT_HISTORY_MAX,
 } from './constants.js';
 import { isDemoEnabled, startDemoMode, stopDemoMode } from './demoMode.js';
 import { initAuthRoutes } from './auth/routes.js';
 import { setupAgentNodeNamespace } from './agentNodeHandler.js';
+import { loadDashboardStats, getDashboardStats, flushDashboardStats } from './dashboardStats.js';
 
 // ── 狀態 ────────────────────────────────────────────────────
 
@@ -51,6 +55,15 @@ const pollingTimers = new Map<number, ReturnType<typeof setInterval>>();
 const waitingTimers = new Map<number, ReturnType<typeof setTimeout>>();
 const jsonlPollTimers = new Map<number, ReturnType<typeof setInterval>>();
 const permissionTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+// ── 聊天狀態 ────────────────────────────────────────────────
+/** 每個樓層的聊天歷史 */
+const chatHistory = new Map<string, Array<{ nickname: string; text: string; ts: number }>>();
+/** socketId → 暱稱 */
+const socketNicknames = new Map<string, string>();
+/** socketId → 上次聊天訊息時間戳（速率限制） */
+const socketChatLastTs = new Map<string, number>();
+let nextNicknameCounter = 1;
 
 // 已載入的素材（啟動時快取）
 let cachedCharSprites: LoadedCharacterSprites | null = null;
@@ -184,6 +197,7 @@ async function main(): Promise<void> {
 	const assetsRoot = findAssetsRoot();
 	console.log(`[Pixel Agents] Assets root: ${assetsRoot}`);
 
+	loadDashboardStats();
 	defaultLayout = await loadDefaultLayout(assetsRoot);
 	cachedCharSprites = await loadCharacterSprites(assetsRoot);
 	cachedFloorTiles = await loadFloorTiles(assetsRoot);
@@ -254,6 +268,7 @@ async function main(): Promise<void> {
 		const defaultFloor = ctx.building.defaultFloorId;
 		socket.join(`floor:${defaultFloor}`);
 		socketFloors.set(socket.id, defaultFloor);
+		socketNicknames.set(socket.id, `User-${nextNicknameCounter++}`);
 
 		// 單播 sender — 用於對請求者的直接回覆（webviewReady 素材/佈局等）
 		const directSender: MessageSender = {
@@ -269,6 +284,8 @@ async function main(): Promise<void> {
 		socket.on('disconnect', () => {
 			console.log(`[Pixel Agents] Client disconnected: ${socket.id}`);
 			socketFloors.delete(socket.id);
+			socketNicknames.delete(socket.id);
+			socketChatLastTs.delete(socket.id);
 			if (isDemoEnabled()) {
 				stopDemoMode();
 			}
@@ -325,6 +342,7 @@ function setupGracefulShutdown(
 		permissionTimers.clear();
 
 		persistAgents();
+		flushDashboardStats();
 
 		io.close(() => {
 			httpServer.close(() => {
@@ -399,6 +417,10 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 
 			// 傳送各樓層代理數量摘要
 			ctx.broadcastFloorSummaries();
+
+			// 傳送當前樓層的聊天歷史
+			const floorChatHistory = chatHistory.get(currentFloor) || [];
+			sender.postMessage({ type: 'chatHistory', messages: floorChatHistory });
 
 			// 演示模式或真實的自動偵測
 			if (isDemoEnabled()) {
@@ -539,6 +561,9 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 				getAgentSeatsPath(), {},
 			);
 			sendExistingAgents(agents, switchMeta, sender, ownProjectDir, msg.floorId);
+			// 傳送新樓層的聊天歷史
+			const switchChatHistory = chatHistory.get(msg.floorId) || [];
+			sender.postMessage({ type: 'chatHistory', messages: switchChatHistory });
 			break;
 		}
 		case 'saveFloorLayout': {
@@ -565,6 +590,116 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			renameBuildingFloor(ctx.building, msg.floorId, msg.name);
 			console.log(`[Pixel Agents] Renamed floor ${msg.floorId} to "${msg.name}"`);
 			ctx.sender?.postMessage({ type: 'buildingConfig', building: ctx.building });
+			break;
+		}
+		case 'chatMessage': {
+			if (!socket) break;
+			const text = typeof msg.text === 'string' ? msg.text.trim().slice(0, CHAT_MESSAGE_MAX_LENGTH) : '';
+			if (!text) break;
+			// 速率限制
+			const now = Date.now();
+			const lastTs = socketChatLastTs.get(socket.id) || 0;
+			if (now - lastTs < CHAT_RATE_LIMIT_MS) break;
+			socketChatLastTs.set(socket.id, now);
+			const nickname = socketNicknames.get(socket.id) || 'User';
+			const floorId = socketFloors.get(socket.id) || ctx.building.defaultFloorId;
+			const chatMsg = { nickname, text, ts: now };
+			// 儲存至歷史
+			let history = chatHistory.get(floorId);
+			if (!history) {
+				history = [];
+				chatHistory.set(floorId, history);
+			}
+			history.push(chatMsg);
+			if (history.length > CHAT_HISTORY_MAX) {
+				history.splice(0, history.length - CHAT_HISTORY_MAX);
+			}
+			// 廣播至同樓層
+			ctx.floorSender(floorId).postMessage({ type: 'chatMessage', ...chatMsg });
+			break;
+		}
+		case 'setNickname': {
+			if (!socket) break;
+			const nickname = typeof msg.nickname === 'string' ? msg.nickname.trim().slice(0, 20) : '';
+			if (nickname) {
+				socketNicknames.set(socket.id, nickname);
+			}
+			break;
+		}
+		case 'moveAgentToFloor': {
+			const agent = agents.get(msg.agentId);
+			if (!agent) break;
+			const targetFloor = ctx.building.floors.find((f) => f.id === msg.targetFloorId);
+			if (!targetFloor) break;
+			if (agent.floorId === msg.targetFloorId) break;
+			const oldFloorId = agent.floorId;
+			// 通知舊樓層角色將離開
+			ctx.floorSender(oldFloorId).postMessage({ type: 'agentFloorTransfer', id: msg.agentId, targetFloorId: msg.targetFloorId });
+			// 更新代理樓層
+			agent.floorId = msg.targetFloorId;
+			persistAgents();
+			// 通知新樓層角色到達（帶 fromElevator 標記）
+			ctx.floorSender(msg.targetFloorId).postMessage({
+				type: 'agentCreated',
+				id: msg.agentId,
+				projectName: agent.projectDir ? path.basename(agent.projectDir) : undefined,
+				floorId: msg.targetFloorId,
+				isRemote: agent.isRemote || undefined,
+				owner: agent.owner || undefined,
+				fromElevator: true,
+			});
+			ctx.broadcastFloorSummaries();
+			console.log(`[Pixel Agents] Agent ${msg.agentId} transferred from ${oldFloorId} to ${msg.targetFloorId}`);
+			break;
+		}
+		case 'requestDashboardData': {
+			const dashStats = getDashboardStats();
+			const floorCounts = new Map<string, { total: number; active: number }>();
+			for (const f of ctx.building.floors) {
+				floorCounts.set(f.id, { total: 0, active: 0 });
+			}
+			const agentList: Array<{ id: number; projectName: string; floorId: string; floorName: string; isActive: boolean; model: string; isRemote: boolean; owner: string; activeToolName: string; toolCount: number }> = [];
+			let activeCount = 0;
+			for (const [agentId, agent] of agents) {
+				const isActive = agent.activeToolIds.size > 0;
+				if (isActive) activeCount++;
+				const fc = floorCounts.get(agent.floorId);
+				if (fc) {
+					fc.total++;
+					if (isActive) fc.active++;
+				}
+				const floorCfg = ctx.building.floors.find((f) => f.id === agent.floorId);
+				const toolNames = Array.from(agent.activeToolNames.values());
+				agentList.push({
+					id: agentId,
+					projectName: agent.projectDir ? path.basename(agent.projectDir) : '',
+					floorId: agent.floorId,
+					floorName: floorCfg?.name || agent.floorId,
+					isActive,
+					model: agent.model || '',
+					isRemote: agent.isRemote,
+					owner: agent.owner || '',
+					activeToolName: toolNames.length > 0 ? toolNames[0] : '',
+					toolCount: agent.activeToolIds.size,
+				});
+			}
+			const floors = ctx.building.floors.map((f) => {
+				const c = floorCounts.get(f.id) || { total: 0, active: 0 };
+				return { id: f.id, name: f.name, order: f.order, agentCount: c.total, activeCount: c.active };
+			});
+			sender.postMessage({
+				type: 'dashboardData',
+				data: {
+					floors,
+					agents: agentList,
+					stats: {
+						totalAgents: agents.size,
+						activeAgents: activeCount,
+						totalToolCalls: dashStats.totalToolCalls,
+						toolDistribution: dashStats.toolDistribution,
+					},
+				},
+			});
 			break;
 		}
 	}

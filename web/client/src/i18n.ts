@@ -127,4 +127,38 @@ export const t = {
   newFloorName: '新樓層',
   deleteFloorConfirm: '確定移除此樓層？',
   cannotDeleteLastFloor: '無法移除唯一的樓層',
+  // 日夜循環
+  dayNightCycle: '日夜循環',
+  useRealTime: '使用真實時間',
+  timeOverride: '時間覆寫',
+
+  // 聊天
+  chatPlaceholder: '輸入訊息...',
+  chatSend: '傳送',
+  chat: '聊天',
+  chatNickname: '暱稱',
+
+  // 會議
+  meeting: '會議中',
+
+  // 跨樓層
+  elevator: '電梯',
+  movingFloor: '移動樓層中',
+
+  // 儀表板
+  dashboard: '儀表板',
+  openDashboard: '在新分頁開啟儀表板',
+  totalAgents: '總代理數',
+  activeAgents: '活躍代理',
+  totalToolCalls: '工具呼叫數',
+  toolDistribution: '工具使用分布',
+  floorOverview: '樓層總覽',
+  agentList: '代理列表',
+  project: '專案',
+  status: '狀態',
+  tool: '工具',
+  model: '模型',
+  active: '活躍',
+  inactive: '閒置',
+  remote: '遠端',
 } as const

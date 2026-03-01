@@ -6,6 +6,7 @@ import { startGameLoop } from '../engine/gameLoop.js'
 import { renderFrame } from '../engine/renderer.js'
 import { TILE_SIZE, EditTool } from '../types.js'
 import { CAMERA_FOLLOW_LERP, CAMERA_FOLLOW_SNAP_THRESHOLD, ZOOM_MIN, ZOOM_MAX, ZOOM_SCROLL_THRESHOLD, PAN_MARGIN_FRACTION, LONG_PRESS_DURATION_MS } from '../../constants.js'
+import { getDayPhase, getDayNightOverlay } from '../engine/dayNightCycle.js'
 import { getCatalogEntry, isRotatable } from '../layout/furnitureCatalog.js'
 import { canPlaceFurniture, getWallPlacementRow } from '../editor/editorActions.js'
 import { vscode } from '../../socketApi.js'
@@ -26,15 +27,22 @@ interface OfficeCanvasProps {
   zoom: number
   onZoomChange: (zoom: number) => void
   panRef: React.MutableRefObject<{ x: number; y: number }>
+  dayNightEnabled?: boolean
+  dayNightTimeOverride?: number | null
 }
 
-export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, onEditorTileAction, onEditorEraseAction, onEditorSelectionChange, onDeleteSelected, onRotateSelected, onDragMove, editorTick: _editorTick, zoom, onZoomChange, panRef }: OfficeCanvasProps) {
+export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, onEditorTileAction, onEditorEraseAction, onEditorSelectionChange, onDeleteSelected, onRotateSelected, onDragMove, editorTick: _editorTick, zoom, onZoomChange, panRef, dayNightEnabled, dayNightTimeOverride }: OfficeCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const offsetRef = useRef({ x: 0, y: 0 })
   // zoom 的 ref，使遊戲迴圈可讀取最新值而不需重啟
   const zoomRef = useRef(zoom)
   zoomRef.current = zoom
+  // 日夜循環 refs
+  const dayNightEnabledRef = useRef(dayNightEnabled ?? true)
+  dayNightEnabledRef.current = dayNightEnabled ?? true
+  const dayNightTimeOverrideRef = useRef<number | null>(dayNightTimeOverride ?? null)
+  dayNightTimeOverrideRef.current = dayNightTimeOverride ?? null
   // 中鍵平移狀態（命令式，不觸發重新渲染）
   const isPanningRef = useRef(false)
   const panStartRef = useRef({ mouseX: 0, mouseY: 0, panX: 0, panY: 0 })
@@ -93,6 +101,14 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
 
     const stop = startGameLoop(canvas, {
       update: (dt) => {
+        // 日夜階段更新
+        if (dayNightEnabledRef.current) {
+          const now = new Date()
+          const h = dayNightTimeOverrideRef.current !== null ? dayNightTimeOverrideRef.current : now.getHours()
+          officeState.setDayPhase(getDayPhase(h))
+        } else {
+          officeState.setDayPhase('day')
+        }
         officeState.update(dt)
       },
       render: (ctx) => {
@@ -210,6 +226,15 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           characters: officeState.characters,
         }
 
+        // 日夜色溫覆蓋計算
+        let overlay: { color: string; alpha: number } | undefined
+        if (dayNightEnabledRef.current) {
+          const now = new Date()
+          const h = dayNightTimeOverrideRef.current !== null ? dayNightTimeOverrideRef.current : now.getHours()
+          const m = dayNightTimeOverrideRef.current !== null ? 0 : now.getMinutes()
+          overlay = getDayNightOverlay(h, m)
+        }
+
         const { offsetX, offsetY } = renderFrame(
           ctx,
           w,
@@ -225,6 +250,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           officeState.getLayout().tileColors,
           officeState.getLayout().cols,
           officeState.getLayout().rows,
+          overlay,
         )
         offsetRef.current = { x: offsetX, y: offsetY }
 
@@ -239,6 +265,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
       observer.disconnect()
     }
   }, [officeState, resizeCanvas, isEditMode, editorState, _editorTick, panRef])
+
 
   // 將 CSS 滑鼠座標轉換為世界（精靈像素）座標
   const screenToWorld = useCallback(

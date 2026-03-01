@@ -82,7 +82,11 @@ export type ClientMessage =
 	| { type: 'saveFloorLayout'; floorId: FloorId; layout: Record<string, unknown> }
 	| { type: 'renameFloor'; floorId: FloorId; name: string }
 	| { type: 'addFloor'; name: string }
-	| { type: 'removeFloor'; floorId: FloorId };
+	| { type: 'removeFloor'; floorId: FloorId }
+	| { type: 'chatMessage'; text: string }
+	| { type: 'setNickname'; nickname: string }
+	| { type: 'moveAgentToFloor'; agentId: number; targetFloorId: FloorId }
+	| { type: 'requestDashboardData' };
 
 /** 代理上下文 — 集中管理所有共享狀態與計時器，避免函式傳遞大量參數 */
 export interface AgentContext {

@@ -12,6 +12,7 @@ import {
 	MAX_TRANSCRIPT_LOG,
 } from './constants.js';
 import { formatToolStatus, PERMISSION_EXEMPT_TOOLS } from 'pixel-agents-shared';
+import { incrementToolCall } from './dashboardStats.js';
 
 export { formatToolStatus, PERMISSION_EXEMPT_TOOLS };
 
@@ -130,6 +131,8 @@ export function processTranscriptLine(
 									parentToolId: completedToolId,
 								});
 							}
+							const completedToolName = agent.activeToolNames.get(completedToolId);
+							if (completedToolName) incrementToolCall(completedToolName);
 							agent.activeToolIds.delete(completedToolId);
 							agent.activeToolStatuses.delete(completedToolId);
 							agent.activeToolNames.delete(completedToolId);

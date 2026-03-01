@@ -160,6 +160,32 @@ export const TOOL_TYPE_COLORS: Record<string, string> = {
   EnterPlanMode: 'var(--pixel-tool-wait)',
 }
 
+// ── 日夜循環 ──────────────────────────────────────────────────
+export const DAY_NIGHT_DAWN_HOUR = 5
+export const DAY_NIGHT_DAY_HOUR = 7
+export const DAY_NIGHT_DUSK_HOUR = 17
+export const DAY_NIGHT_NIGHT_HOUR = 19
+export const DAY_NIGHT_MAX_ALPHA_NIGHT = 0.25
+export const DAY_NIGHT_MAX_ALPHA_TRANSITION = 0.12
+
+// ── 會議室行為 ────────────────────────────────────────────────
+export const MEETING_MIN_PARTICIPANTS = 2
+export const MEETING_MAX_PARTICIPANTS = 6
+export const MEETING_DURATION_MIN_SEC = 10
+export const MEETING_DURATION_MAX_SEC = 25
+export const WANDER_WEIGHT_MEETING = 8
+export const MEETING_SEAT_SEARCH_RADIUS = 3
+
+// ── 跨樓層移動 ────────────────────────────────────────────────
+export const ELEVATOR_FURNITURE_TYPE = 'elevator'
+
+// ── 聊天面板 ──────────────────────────────────────────────────
+export const CHAT_INPUT_MAX_LENGTH = 100
+export const CHAT_PANEL_MAX_MESSAGES = 50
+
+// ── 儀表板 ────────────────────────────────────────────────────
+export const DASHBOARD_REFRESH_MS = 2000
+
 // ── 觸控 ────────────────────────────────────────────────────
 export const LONG_PRESS_DURATION_MS = 500
 

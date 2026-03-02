@@ -278,8 +278,8 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode,
             <span>{label}</span>
             <span
               style={{
-                width: 14,
-                height: 14,
+                width: 18,
+                height: 18,
                 border: '2px solid rgba(255, 255, 255, 0.4)',
                 borderRadius: 0,
                 background: soundCfg[key] ? 'rgba(90, 140, 255, 0.8)' : 'transparent',
@@ -287,7 +287,7 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '10px',
+                fontSize: '12px',
                 lineHeight: 1,
                 color: '#fff',
               }}

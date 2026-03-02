@@ -1,27 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { vscode, onServerMessage } from '../socketApi.js'
 import { t } from '../i18n.js'
-import { DASHBOARD_REFRESH_MS } from '../constants.js'
+import { DASHBOARD_REFRESH_MS, TOOL_TYPE_COLORS_HEX } from '../constants.js'
 import type { DashboardPayload } from '../types/messages.js'
 
-const TOOL_COLORS: Record<string, string> = {
-  Read: '#5b8def',
-  Write: '#5b8def',
-  Edit: '#5b8def',
-  Glob: '#5bcfef',
-  Grep: '#5bcfef',
-  Bash: '#5bef7a',
-  WebFetch: '#b07aef',
-  WebSearch: '#b07aef',
-  Agent: '#efcf5b',
-  default: '#ef5baa',
-}
-
 function getToolColor(name: string): string {
-  for (const [key, color] of Object.entries(TOOL_COLORS)) {
+  for (const [key, color] of Object.entries(TOOL_TYPE_COLORS_HEX)) {
+    if (key === 'default') continue
     if (name.includes(key)) return color
   }
-  return TOOL_COLORS.default
+  return TOOL_TYPE_COLORS_HEX.default
 }
 
 export function Dashboard() {

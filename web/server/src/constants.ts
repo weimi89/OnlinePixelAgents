@@ -86,3 +86,8 @@ export const TERMINAL_DEFAULT_ROWS = 24;
 // ── 伺服器 ──────────────────────────────────────────────────
 export const DEFAULT_PORT = 3000;
 export const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 5000; // 強制退出前的寬限時間
+export const SOCKET_IO_MAX_BUFFER_SIZE = 10 * 1024 * 1024; // 10MB，用於大型素材傳輸
+export const GIT_ROOT_MAX_DEPTH = 50; // findGitRoot 最大向上搜尋深度（防止符號連結循環）
+
+// ── 轉錄解析 ──────────────────────────────────────────────────
+export const THINKING_DEPTH_THRESHOLD = 2000; // thinking 區塊字元數閾值，超過觸發 idea 表情

@@ -228,6 +228,8 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode,
           }}
           onMouseEnter={() => setHovered('sound')}
           onMouseLeave={() => setHovered(null)}
+          role="switch"
+          aria-checked={soundLocal}
           style={{
             ...menuItemBase,
             background: hovered === 'sound' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
@@ -268,6 +270,8 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode,
             }}
             onMouseEnter={() => setHovered(`sound-${key}`)}
             onMouseLeave={() => setHovered(null)}
+            role="switch"
+            aria-checked={soundCfg[key]}
             style={{
               ...menuItemBase,
               paddingLeft: 24,
@@ -300,6 +304,8 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode,
           onClick={onToggleDayNight}
           onMouseEnter={() => setHovered('daynight')}
           onMouseLeave={() => setHovered(null)}
+          role="switch"
+          aria-checked={dayNightEnabled}
           style={{
             ...menuItemBase,
             background: hovered === 'daynight' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
@@ -375,6 +381,8 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode,
             }}
             onMouseEnter={() => setHovered('lan')}
             onMouseLeave={() => setHovered(null)}
+            role="switch"
+            aria-checked={lanEnabled}
             style={{
               ...menuItemBase,
               background: hovered === 'lan' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',

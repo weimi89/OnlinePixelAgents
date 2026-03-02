@@ -287,4 +287,8 @@ export interface Character {
   teamName: string | null
   /** 此角色的團隊顏色（從 TEAM_COLORS 陣列分配） */
   teamColor: string | null
+  /** 最近訪問的家具記錄：furnitureUID → 上次訪問的遊戲時間（秒） */
+  recentFurnitureVisits: Map<string, number>
+  /** 遊戲內累計時間（秒） */
+  gameTime: number
 }

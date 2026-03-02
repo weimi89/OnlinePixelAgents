@@ -12,6 +12,7 @@ import {
 	TEXT_IDLE_DELAY_MS,
 	MAX_TRANSCRIPT_LOG,
 	MAX_STATUS_HISTORY,
+	THINKING_DEPTH_THRESHOLD,
 } from './constants.js';
 
 /** Git branch 偵測正則：匹配 'On branch xxx' 或 '* branch-name' 模式 */
@@ -78,10 +79,19 @@ export function processTranscriptLine(
 			}>;
 
 			// 偵測 thinking 區塊
-			const hasThinking = blocks.some(b => b.type === 'thinking');
-			if (hasThinking) {
+			const thinkingBlocks = blocks.filter(b => b.type === 'thinking');
+			if (thinkingBlocks.length > 0) {
 				sender?.postMessage({ type: 'agentThinking', id: agentId, thinking: true });
+				// 深度思考：計算 thinking 文字總長度，超過閾值觸發 idea 表情
+				const thinkingLength = thinkingBlocks.reduce((sum, b) => {
+					const text = (b as Record<string, unknown>).thinking as string | undefined;
+					return sum + (text?.length ?? 0);
+				}, 0);
+				if (thinkingLength > THINKING_DEPTH_THRESHOLD) {
+					sender?.postMessage({ type: 'agentEmote', id: agentId, emote: 'idea' });
+				}
 			}
+			const hasThinking = thinkingBlocks.length > 0;
 
 			// 偵測 image 區塊 → 相機表情
 			const hasImage = blocks.some(b => b.type === 'image');

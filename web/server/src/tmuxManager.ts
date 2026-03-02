@@ -60,6 +60,17 @@ export function killTmuxSession(sessionName: string): void {
 	}
 }
 
+/** 向 tmux 會話發送按鍵 */
+export function sendTmuxKeys(sessionName: string, keys: string): void {
+	const result = spawnSync('tmux', ['send-keys', '-t', sessionName, keys], {
+		encoding: 'utf-8',
+		stdio: 'pipe',
+	});
+	if (result.status !== 0) {
+		console.warn(`[Pixel Agents] Failed to send keys to tmux session ${sessionName}: ${(result.stderr || '').trim()}`);
+	}
+}
+
 /** 檢查 tmux 會話是否仍然存活 */
 export function isTmuxSessionAlive(sessionName: string): boolean {
 	const result = spawnSync('tmux', ['has-session', '-t', sessionName], {

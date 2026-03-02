@@ -37,6 +37,10 @@ import {
   MEETING_DURATION_MIN_SEC,
   MEETING_DURATION_MAX_SEC,
   MEETING_SEAT_SEARCH_RADIUS,
+  FURNITURE_COOLDOWN_SEC,
+  FURNITURE_WEIGHT_DECAY,
+  FURNITURE_VISIT_HISTORY_MAX,
+  SIT_WANDER_BONUS_MAX,
 } from '../../constants.js'
 
 /** 顯示閱讀動畫而非打字動畫的工具 */
@@ -102,6 +106,7 @@ export interface UpdateContext {
   blockedTiles: Set<string>
   allCharacters: Map<number, Character>
   furnitureMap: Map<string, { col: number; row: number; type: string }>
+  furnitureUidMap: Map<string, string>
 }
 
 export function createCharacter(
@@ -158,6 +163,8 @@ export function createCharacter(
     transferTargetFloor: null,
     teamName: null,
     teamColor: null,
+    recentFurnitureVisits: new Map(),
+    gameTime: 0,
   }
 }
 
@@ -199,7 +206,15 @@ function pickWanderAction(
     }
   }
   if (closestFurniture) {
-    weights.push({ type: 'furniture', weight: WANDER_WEIGHT_FURNITURE, target: { col: closestFurniture.col, row: closestFurniture.row }, furnitureType: closestFurniture.type })
+    // 家具親和度衰減：最近訪問過的家具權重減半
+    const fKey = `${closestFurniture.col},${closestFurniture.row}`
+    const fUid = ctx.furnitureUidMap.get(fKey)
+    const lastVisit = fUid ? (ch.recentFurnitureVisits.get(fUid) ?? -Infinity) : -Infinity
+    const timeSinceVisit = ch.gameTime - lastVisit
+    const fWeight = timeSinceVisit < FURNITURE_COOLDOWN_SEC
+      ? Math.round(WANDER_WEIGHT_FURNITURE * FURNITURE_WEIGHT_DECAY)
+      : WANDER_WEIGHT_FURNITURE
+    weights.push({ type: 'furniture', weight: fWeight, target: { col: closestFurniture.col, row: closestFurniture.row }, furnitureType: closestFurniture.type })
   }
 
   // 聊天對象
@@ -232,7 +247,15 @@ function pickWanderAction(
     }
   }
   if (closestWall) {
-    weights.push({ type: 'wall', weight: WANDER_WEIGHT_WALL, target: { col: closestWall.col, row: closestWall.row }, furnitureType: closestWall.type })
+    // 牆壁互動親和度衰減
+    const wKey = `${closestWall.col},${closestWall.row}`
+    const wUid = ctx.furnitureUidMap.get(wKey)
+    const wLastVisit = wUid ? (ch.recentFurnitureVisits.get(wUid) ?? -Infinity) : -Infinity
+    const wTimeSince = ch.gameTime - wLastVisit
+    const wWeight = wTimeSince < FURNITURE_COOLDOWN_SEC
+      ? Math.round(WANDER_WEIGHT_WALL * FURNITURE_WEIGHT_DECAY)
+      : WANDER_WEIGHT_WALL
+    weights.push({ type: 'wall', weight: wWeight, target: { col: closestWall.col, row: closestWall.row }, furnitureType: closestWall.type })
   }
 
   // 會議桌 — 附近有足夠的非活躍角色時加入
@@ -334,6 +357,7 @@ export function updateCharacter(
   ctx: UpdateContext,
 ): void {
   ch.frameTimer += dt
+  ch.gameTime += dt
 
   switch (ch.state) {
     case CharacterState.TYPE: {
@@ -374,6 +398,9 @@ export function updateCharacter(
           break
         }
 
+        // 久坐後額外漫遊次數（按坐姿時間比例，最多 SIT_WANDER_BONUS_MAX）
+        const sitRatio = Math.min(1, ch.sitTimer / STRETCH_TRIGGER_SIT_SEC)
+        const sitBonus = Math.floor(sitRatio * SIT_WANDER_BONUS_MAX)
         ch.state = CharacterState.IDLE
         ch.frame = 0
         ch.frameTimer = 0
@@ -381,7 +408,7 @@ export function updateCharacter(
         ch.sleepTimer = 0
         ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC)
         ch.wanderCount = 0
-        ch.wanderLimit = randomInt(WANDER_MOVES_BEFORE_REST_MIN, WANDER_MOVES_BEFORE_REST_MAX)
+        ch.wanderLimit = randomInt(WANDER_MOVES_BEFORE_REST_MIN, WANDER_MOVES_BEFORE_REST_MAX) + sitBonus
       }
       break
     }
@@ -650,6 +677,18 @@ export function updateCharacter(
                 }
                 ch.frame = 0
                 ch.frameTimer = 0
+                // 記錄家具訪問（用於親和度衰減）
+                const visitUid = ctx.furnitureUidMap.get(fKey)
+                if (visitUid) {
+                  ch.recentFurnitureVisits.set(visitUid, ch.gameTime)
+                  if (ch.recentFurnitureVisits.size > FURNITURE_VISIT_HISTORY_MAX) {
+                    let oldestKey = '', oldestTime = Infinity
+                    for (const [k, t] of ch.recentFurnitureVisits) {
+                      if (t < oldestTime) { oldestTime = t; oldestKey = k }
+                    }
+                    ch.recentFurnitureVisits.delete(oldestKey)
+                  }
+                }
                 ch.interactTarget = null
                 break
               }

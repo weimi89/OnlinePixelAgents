@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import type { ToolActivity } from '../office/types.js'
 import { extractToolName } from '../office/toolUtils.js'
 import { TOOL_TYPE_COLORS } from '../constants.js'
+import { AgentTimeline } from './AgentTimeline.js'
 import { formatModelName } from '../utils.js'
 import { vscode } from '../socketApi.js'
 import { t } from '../i18n.js'
@@ -343,6 +344,16 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
           </div>
         )}
       </div>
+
+      {/* ---- 工具時間軸 ---- */}
+      {tools.length > 0 && (
+        <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--pixel-border)', flexShrink: 0 }}>
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
+            {t.agentDetailTimeline}
+          </div>
+          <AgentTimeline tools={tools} />
+        </div>
+      )}
 
       {/* ---- 狀態歷史（固定標題 + 獨立捲動） ---- */}
       <div style={{ ...sectionHeaderStyle, borderTop: '2px solid var(--pixel-border)' }}>

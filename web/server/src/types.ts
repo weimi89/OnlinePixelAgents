@@ -102,7 +102,9 @@ export type ClientMessage =
 	| { type: 'requestStatusHistory'; agentId: number }
 	| { type: 'setAgentTeam'; agentId: number; teamName: string | null }
 	| { type: 'setLanDiscoveryEnabled'; enabled: boolean }
-	| { type: 'setLanPeerName'; name: string };
+	| { type: 'setLanPeerName'; name: string }
+	| { type: 'approvePermission'; agentId: number }
+	| { type: 'approveAllPermissions' };
 
 /** 代理上下文 — 集中管理所有共享狀態與計時器，避免函式傳遞大量參數 */
 export interface AgentContext {

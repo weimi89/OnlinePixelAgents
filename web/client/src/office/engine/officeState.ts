@@ -795,6 +795,18 @@ export class OfficeState {
   update(dt: number): void {
     // 建構 UpdateContext（每幀共享）
     const furnitureMap = this.buildFurnitureMap()
+    // 家具 UID 映射（"col,row" → uid，用於親和度衰減）
+    const furnitureUidMap = new Map<string, string>()
+    for (const item of this.layout.furniture) {
+      const entry = getCatalogEntry(item.type)
+      const w = entry ? entry.footprintW : 1
+      const h = entry ? entry.footprintH : 1
+      for (let dr = 0; dr < h; dr++) {
+        for (let dc = 0; dc < w; dc++) {
+          furnitureUidMap.set(`${item.col + dc},${item.row + dr}`, item.uid)
+        }
+      }
+    }
     const ctx: UpdateContext = {
       walkableTiles: this.walkableTiles,
       seats: this.seats,
@@ -802,6 +814,7 @@ export class OfficeState {
       blockedTiles: this.blockedTiles,
       allCharacters: this.characters,
       furnitureMap,
+      furnitureUidMap,
     }
 
     const toDelete: number[] = []

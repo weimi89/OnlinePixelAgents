@@ -31,9 +31,21 @@ function generateSeeds(): number[] {
 
 export { generateSeeds as matrixEffectSeeds }
 
+/** 量化 alpha 至 0.05 精度，減少 Map 鍵碎片化 */
+function quantizeAlpha(alpha: number): number {
+  return Math.round(alpha * 20) / 20
+}
+
+/** 選取拖尾綠色 RGB 通道 */
+function trailRGB(trailPos: number): string {
+  if (trailPos < MATRIX_TRAIL_MID_THRESHOLD) return '0,255,65'
+  if (trailPos < MATRIX_TRAIL_DIM_THRESHOLD) return '0,170,40'
+  return '0,85,20'
+}
+
 /**
  * 以 Matrix 風格數位雨生成/消散特效渲染角色。
- * 逐像素渲染：每欄從上到下掃過，帶有明亮的頭部和漸隱的綠色拖尾。
+ * 按顏色批次繪製以減少 fillStyle 切換次數。
  */
 export function renderMatrixEffect(
   ctx: CanvasRenderingContext2D,
@@ -48,8 +60,15 @@ export function renderMatrixEffect(
   const time = ch.matrixEffectTimer
   const totalSweep = MATRIX_SPRITE_ROWS + MATRIX_TRAIL_LENGTH
 
+  // 階段 1：蒐集像素至顏色批次（避免頻繁 fillStyle 切換）
+  const batches = new Map<string, Array<number>>()
+  function emit(color: string, px: number, py: number) {
+    let arr = batches.get(color)
+    if (!arr) { arr = []; batches.set(color, arr) }
+    arr.push(px, py)
+  }
+
   for (let col = 0; col < MATRIX_SPRITE_COLS; col++) {
-    // 交錯：每欄在略微不同的時間開始
     const stagger = (ch.matrixEffectSeeds[col] ?? 0) * MATRIX_COLUMN_STAGGER_RANGE
     const colProgress = Math.max(0, Math.min(1, (progress - stagger) / (1 - MATRIX_COLUMN_STAGGER_RANGE)))
     const headRow = colProgress * totalSweep
@@ -62,69 +81,52 @@ export function renderMatrixEffect(
       const py = drawY + row * zoom
 
       if (isSpawn) {
-        // 生成：頭部向下掃過，顯現角色像素
         if (distFromHead < 0) {
-          // 頭部上方：不可見
           continue
         } else if (distFromHead < 1) {
-          // 頭部像素：明亮的白綠色
-          ctx.fillStyle = MATRIX_HEAD_COLOR
-          ctx.fillRect(px, py, zoom, zoom)
+          emit(MATRIX_HEAD_COLOR, px, py)
         } else if (distFromHead < MATRIX_TRAIL_LENGTH) {
-          // 拖尾區域：顯示帶綠色覆蓋的角色像素，或無像素時僅顯示綠色
           const trailPos = distFromHead / MATRIX_TRAIL_LENGTH
           if (hasPixel) {
-            // 繪製原始像素
-            ctx.fillStyle = pixel
-            ctx.fillRect(px, py, zoom, zoom)
-            // 隨拖尾進展而淡出的綠色覆蓋層
-            const greenAlpha = (1 - trailPos) * MATRIX_TRAIL_OVERLAY_ALPHA
+            emit(pixel, px, py)
             if (flickerVisible(col, row, time)) {
-              ctx.fillStyle = `rgba(0, 255, 65, ${greenAlpha})`
-              ctx.fillRect(px, py, zoom, zoom)
+              const greenAlpha = quantizeAlpha((1 - trailPos) * MATRIX_TRAIL_OVERLAY_ALPHA)
+              emit(`rgba(0,255,65,${greenAlpha})`, px, py)
             }
           } else {
-            // 無角色像素：漸隱的綠色拖尾
             if (flickerVisible(col, row, time)) {
-              const alpha = (1 - trailPos) * MATRIX_TRAIL_EMPTY_ALPHA
-              ctx.fillStyle = trailPos < MATRIX_TRAIL_MID_THRESHOLD ? `rgba(0, 255, 65, ${alpha})`
-                : trailPos < MATRIX_TRAIL_DIM_THRESHOLD ? `rgba(0, 170, 40, ${alpha})`
-                  : `rgba(0, 85, 20, ${alpha})`
-              ctx.fillRect(px, py, zoom, zoom)
+              const alpha = quantizeAlpha((1 - trailPos) * MATRIX_TRAIL_EMPTY_ALPHA)
+              emit(`rgba(${trailRGB(trailPos)},${alpha})`, px, py)
             }
           }
         } else {
-          // 拖尾下方：正常角色像素
           if (hasPixel) {
-            ctx.fillStyle = pixel
-            ctx.fillRect(px, py, zoom, zoom)
+            emit(pixel, px, py)
           }
         }
       } else {
-        // 消散：頭部向下掃過，吞噬角色像素
         if (distFromHead < 0) {
-          // 頭部上方：正常角色像素（尚未被吞噬）
           if (hasPixel) {
-            ctx.fillStyle = pixel
-            ctx.fillRect(px, py, zoom, zoom)
+            emit(pixel, px, py)
           }
         } else if (distFromHead < 1) {
-          // 頭部像素：明亮的白綠色
-          ctx.fillStyle = MATRIX_HEAD_COLOR
-          ctx.fillRect(px, py, zoom, zoom)
+          emit(MATRIX_HEAD_COLOR, px, py)
         } else if (distFromHead < MATRIX_TRAIL_LENGTH) {
-          // 拖尾區域：漸隱的綠色
           if (flickerVisible(col, row, time)) {
             const trailPos = distFromHead / MATRIX_TRAIL_LENGTH
-            const alpha = (1 - trailPos) * MATRIX_TRAIL_EMPTY_ALPHA
-            ctx.fillStyle = trailPos < MATRIX_TRAIL_MID_THRESHOLD ? `rgba(0, 255, 65, ${alpha})`
-              : trailPos < MATRIX_TRAIL_DIM_THRESHOLD ? `rgba(0, 170, 40, ${alpha})`
-                : `rgba(0, 85, 20, ${alpha})`
-            ctx.fillRect(px, py, zoom, zoom)
+            const alpha = quantizeAlpha((1 - trailPos) * MATRIX_TRAIL_EMPTY_ALPHA)
+            emit(`rgba(${trailRGB(trailPos)},${alpha})`, px, py)
           }
         }
-        // 拖尾下方：空（已被吞噬）
       }
+    }
+  }
+
+  // 階段 2：按顏色批次繪製
+  for (const [color, coords] of batches) {
+    ctx.fillStyle = color
+    for (let i = 0; i < coords.length; i += 2) {
+      ctx.fillRect(coords[i], coords[i + 1], zoom, zoom)
     }
   }
 }

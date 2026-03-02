@@ -25,9 +25,12 @@
     "typecheck": "npm run typecheck:client && npm run typecheck:server",
     "typecheck:client": "cd client && npx tsc --noEmit",
     "typecheck:server": "cd server && npx tsc --noEmit",
-    "test": "cd server && npm test"
+    "test": "cd server && npm test",
+    "format": "prettier --write 'client/src/**/*.{ts,tsx}' 'server/src/**/*.ts' 'shared/src/**/*.ts'",
+    "format:check": "prettier --check 'client/src/**/*.{ts,tsx}' 'server/src/**/*.ts' 'shared/src/**/*.ts'"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "prettier": "^3.8.1"
   }
 }

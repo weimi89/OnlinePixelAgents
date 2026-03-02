@@ -164,6 +164,12 @@ export const WANDER_WEIGHT_RETURN_SEAT = 5
 export const WANDER_RANDOM_RADIUS = 3             // 隨機漫遊最大格數
 export const WANDER_MAX_PATH_STEPS = 5            // 路徑最長步數（截斷）
 
+// ── 家具親和度衰減 ────────────────────────────────────────────
+export const FURNITURE_COOLDOWN_SEC = 180      // 訪問後 3 分鐘內降低親和度
+export const FURNITURE_WEIGHT_DECAY = 0.5      // 冷卻期間的權重乘數
+export const FURNITURE_VISIT_HISTORY_MAX = 20  // 每角色最多記錄的家具訪問數
+export const SIT_WANDER_BONUS_MAX = 3          // 久坐後額外漫遊次數上限
+
 // ── 工具類型顏色映射 ──────────────────────────────────────────
 export const TOOL_TYPE_COLORS: Record<string, string> = {
   Read: 'var(--pixel-tool-read)',
@@ -178,6 +184,17 @@ export const TOOL_TYPE_COLORS: Record<string, string> = {
   Task: 'var(--pixel-tool-task)',
   AskUserQuestion: 'var(--pixel-tool-wait)',
   EnterPlanMode: 'var(--pixel-tool-wait)',
+}
+
+/** 工具類型顏色原始 hex（用於 canvas/SVG 無法使用 CSS 變數的場景） */
+export const TOOL_TYPE_COLORS_HEX: Record<string, string> = {
+  Read: '#5ca3ff', Grep: '#5ca3ff', Glob: '#5ca3ff',
+  WebFetch: '#5ca3ff', WebSearch: '#5ca3ff',
+  Edit: '#ff6b6b', Write: '#ff6b6b', NotebookEdit: '#ff6b6b',
+  Bash: '#5bef7a',
+  Task: '#c78cff', Agent: '#c78cff',
+  AskUserQuestion: '#cca700', EnterPlanMode: '#cca700',
+  default: '#ef5baa',
 }
 
 // ── 日夜循環 ──────────────────────────────────────────────────

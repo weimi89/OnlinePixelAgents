@@ -321,7 +321,7 @@ function App() {
     setDetailPanelAgentId((prev) => prev === focusId ? null : focusId)
   }, [])
 
-  // Space 鍵關閉選取代理的氣泡（非編輯模式）
+  // Space 鍵批准/關閉選取代理的氣泡，Ctrl+A 批准全部（非編輯模式）
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (editor.isEditMode) return
@@ -331,7 +331,25 @@ function App() {
         const os = getOfficeState()
         const selId = os.selectedAgentId
         if (selId != null) {
+          const ch = os.characters.get(selId)
+          if (ch?.bubbleType === 'permission') {
+            vscode.postMessage({ type: 'approvePermission', agentId: selId })
+          }
           os.dismissBubble(selId)
+        }
+      }
+      if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+        const os = getOfficeState()
+        let hasPermission = false
+        for (const ch of os.characters.values()) {
+          if (ch.bubbleType === 'permission') { hasPermission = true; break }
+        }
+        if (hasPermission) {
+          e.preventDefault()
+          vscode.postMessage({ type: 'approveAllPermissions' })
+          for (const [id, ch] of os.characters) {
+            if (ch.bubbleType === 'permission') os.dismissBubble(id)
+          }
         }
       }
     }

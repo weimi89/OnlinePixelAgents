@@ -36,8 +36,12 @@ import {
 	CHAT_MESSAGE_MAX_LENGTH,
 	CHAT_RATE_LIMIT_MS,
 	CHAT_HISTORY_MAX,
+	SOCKET_IO_MAX_BUFFER_SIZE,
+	GIT_ROOT_MAX_DEPTH,
 } from './constants.js';
 import { isDemoEnabled, startDemoMode, stopDemoMode } from './demoMode.js';
+import { sendTmuxKeys } from './tmuxManager.js';
+import { cancelPermissionTimer } from './timerManager.js';
 import { initAuthRoutes } from './auth/routes.js';
 import { setupAgentNodeNamespace } from './agentNodeHandler.js';
 import { loadDashboardStats, getDashboardStats, flushDashboardStats } from './dashboardStats.js';
@@ -131,12 +135,15 @@ function persistAgents(): void {
 
 function findGitRoot(startDir: string): string | null {
 	let dir = startDir;
-	while (true) {
+	let depth = 0;
+	while (depth < GIT_ROOT_MAX_DEPTH) {
 		if (fs.existsSync(path.join(dir, '.git'))) return dir;
 		const parent = path.dirname(dir);
 		if (parent === dir) return null;
 		dir = parent;
+		depth++;
 	}
+	return null;
 }
 
 const cwd = process.argv[2] || findGitRoot(process.cwd()) || process.cwd();
@@ -241,7 +248,7 @@ async function main(): Promise<void> {
 				'http://localhost:5173', // Vite 開發伺服器
 			],
 		},
-		maxHttpBufferSize: 10 * 1024 * 1024, // 10MB，用於大型素材傳輸
+		maxHttpBufferSize: SOCKET_IO_MAX_BUFFER_SIZE,
 	});
 
 	// JSON body 解析（API 路由需要）
@@ -975,6 +982,35 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 				const current = readJsonFile<Record<string, unknown>>(getSettingsPath(), {});
 				current.lanPeerName = name;
 				writeJsonFile(getSettingsPath(), current);
+			}
+			break;
+		}
+		case 'approvePermission': {
+			const agent = agents.get(msg.agentId);
+			if (!agent || !agent.permissionSent) break;
+			if (agent.tmuxSessionName) {
+				sendTmuxKeys(agent.tmuxSessionName, 'y');
+				sendTmuxKeys(agent.tmuxSessionName, 'Enter');
+			}
+			cancelPermissionTimer(msg.agentId, permissionTimers);
+			agent.permissionSent = false;
+			ctx.floorSender(agent.floorId)?.postMessage({
+				type: 'agentToolPermissionClear', id: msg.agentId,
+			});
+			break;
+		}
+		case 'approveAllPermissions': {
+			for (const [agentId, agent] of agents) {
+				if (!agent.permissionSent) continue;
+				if (agent.tmuxSessionName) {
+					sendTmuxKeys(agent.tmuxSessionName, 'y');
+					sendTmuxKeys(agent.tmuxSessionName, 'Enter');
+				}
+				cancelPermissionTimer(agentId, permissionTimers);
+				agent.permissionSent = false;
+				ctx.floorSender(agent.floorId)?.postMessage({
+					type: 'agentToolPermissionClear', id: agentId,
+				});
 			}
 			break;
 		}

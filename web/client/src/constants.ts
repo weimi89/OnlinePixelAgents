@@ -243,7 +243,7 @@ export const LEVEL_GLOW_COLORS: Array<{ minLevel: number; color: string; alpha: 
   { minLevel: 25, color: '#c0c0c0', alpha: 0.35 },   // 銀色光暈
 ]
 export const LEVEL_BADGE_FONT_SIZE = 5
-export const LEVEL_BADGE_VERTICAL_OFFSET_PX = 28
+export const LEVEL_BADGE_VERTICAL_OFFSET_PX = 34
 
 // ── 團隊視覺化 ────────────────────────────────────────────────
 export const TEAM_COLORS = [

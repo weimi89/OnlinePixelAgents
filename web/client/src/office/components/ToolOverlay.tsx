@@ -142,7 +142,6 @@ export function ToolOverlay({
   const { deviceOffsetX, deviceOffsetY, dpr } = computeCanvasMetrics(el, layout.cols, layout.rows, zoom, panRef.current)
 
   const selectedId = officeState.selectedAgentId
-  const hoveredId = officeState.hoveredAgentId
 
   // 所有角色 ID
   const allIds = [...agents, ...subagentCharacters.map((s) => s.id)]
@@ -154,11 +153,10 @@ export function ToolOverlay({
         if (!ch) return null
 
         const isSelected = selectedId === id
-        const isHovered = hoveredId === id
         const isSub = ch.isSubagent
 
-        // 僅對懸停或選取的代理顯示
-        if (!isSelected && !isHovered) return null
+        // 僅對選取的代理顯示（懸停不再顯示）
+        if (!isSelected) return null
 
         // 定位於角色上方
         const sittingOffset = isSittingState(ch.state) ? CHARACTER_SITTING_OFFSET_PX : 0

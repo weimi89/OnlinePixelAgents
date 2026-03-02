@@ -32,7 +32,6 @@ export const AgentLabels = memo(function AgentLabels({
   const { deviceOffsetX, deviceOffsetY, dpr } = computeCanvasMetrics(el, layout.cols, layout.rows, zoom, panRef.current)
 
   const selectedId = officeState.selectedAgentId
-  const hoveredId = officeState.hoveredAgentId
 
   // 所有需要渲染標籤的角色 ID（一般代理 + 子代理）
   const allIds = [...agents, ...subagentCharacters.map((s) => s.id)]
@@ -45,8 +44,8 @@ export const AgentLabels = memo(function AgentLabels({
 
         // 當非斷線的對話氣泡顯示時隱藏（讓氣泡單獨可見）
         if (ch.bubbleType && ch.bubbleType !== 'detached') return null
-        // 懸停或選取時由 ToolOverlay 負責顯示完整資訊，此處不重複渲染
-        if (selectedId === id || hoveredId === id) return null
+        // 選取時由 AgentDetailPanel 負責顯示完整資訊，此處不重複渲染
+        if (selectedId === id) return null
 
         const status = agentStatuses[id]
         const isWaiting = status === 'waiting'

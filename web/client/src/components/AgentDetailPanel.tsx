@@ -13,6 +13,12 @@ interface GrowthInfo {
   achievements: string[]
 }
 
+interface TranscriptEntry {
+  ts: number
+  role: 'user' | 'assistant' | 'system'
+  summary: string
+}
+
 interface AgentDetailPanelProps {
   agentId: number
   agents: Record<number, { projectName?: string; isRemote?: boolean; owner?: string }>
@@ -22,7 +28,11 @@ interface AgentDetailPanelProps {
   agentGitBranches: Record<number, string>
   agentStatusHistory: Record<number, Array<{ ts: number; status: string; detail?: string }>>
   agentGrowthData: Record<number, GrowthInfo>
+  agentTranscripts?: Record<number, TranscriptEntry[]>
+  agentTeams?: Record<number, string>
+  agentCliTypes?: Record<number, string>
   onClose: () => void
+  onCloseAgent?: (id: number) => void
 }
 
 const PANEL_WIDTH = 320
@@ -181,7 +191,11 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
   agentGitBranches,
   agentStatusHistory,
   agentGrowthData,
+  agentTranscripts,
+  agentTeams,
+  agentCliTypes,
   onClose,
+  onCloseAgent,
 }: AgentDetailPanelProps) {
   const [visible, setVisible] = useState(false)
   const [closeHovered, setCloseHovered] = useState(false)
@@ -227,12 +241,16 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
   // 自動捲動到底部（新項目出現時）
   const toolsScrollRef = useRef<HTMLDivElement>(null)
   const historyScrollRef = useRef<HTMLDivElement>(null)
+  const transcriptScrollRef = useRef<HTMLDivElement>(null)
 
   const agent = agents[agentId]
   const status = agentStatuses[agentId]
   const tools = agentTools[agentId] || []
   const model = agentModels[agentId]
   const branch = agentGitBranches[agentId]
+  const team = agentTeams?.[agentId]
+  const cliType = agentCliTypes?.[agentId]
+  const transcript = agentTranscripts?.[agentId] || []
   const history = agentStatusHistory[agentId] || []
   const growth = agentGrowthData[agentId]
   const { text: statusText, color: statusColor } = statusDisplay(status)
@@ -252,6 +270,14 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
     if (isNearBottom) el.scrollTop = el.scrollHeight
   }, [history.length])
+
+  // 轉錄記錄自動捲動到底部
+  useEffect(() => {
+    const el = transcriptScrollRef.current
+    if (!el) return
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+    if (isNearBottom) el.scrollTop = el.scrollHeight
+  }, [transcript.length])
 
   return (
     <div
@@ -319,6 +345,54 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
           <div style={rowStyle}>
             <span style={labelStyle}>{t.owner}</span>
             <span style={{ ...valueStyle, color: '#e8a040' }}>{agent.owner}</span>
+          </div>
+        )}
+
+        {team && (
+          <div style={rowStyle}>
+            <span style={labelStyle}>{t.team}</span>
+            <span style={{ ...valueStyle, color: 'var(--pixel-tool-task)' }}>{team}</span>
+          </div>
+        )}
+
+        {cliType && (
+          <div style={rowStyle}>
+            <span style={labelStyle}>CLI</span>
+            <span style={{
+              fontSize: '14px',
+              padding: '0 4px',
+              border: '1px solid var(--pixel-accent)',
+              color: 'var(--pixel-accent)',
+            }}>
+              {cliType.toUpperCase()}
+            </span>
+          </div>
+        )}
+
+        {onCloseAgent && !agent?.isRemote && (
+          <div style={{ padding: '4px 10px' }}>
+            <button
+              onClick={() => onCloseAgent(agentId)}
+              style={{
+                background: 'none',
+                border: '1px solid var(--pixel-close-text)',
+                color: 'var(--pixel-close-text)',
+                cursor: 'pointer',
+                padding: '2px 8px',
+                fontSize: '16px',
+                borderRadius: 0,
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.color = 'var(--pixel-close-hover)'
+                ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--pixel-close-hover)'
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.color = 'var(--pixel-close-text)'
+                ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--pixel-close-text)'
+              }}
+            >
+              {t.closeAgent}
+            </button>
           </div>
         )}
       </div>
@@ -482,6 +556,50 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
           </div>
         )}
       </div>
+
+      {/* ---- 對話記錄（固定標題 + 獨立捲動） ---- */}
+      {transcript.length > 0 && (
+        <>
+          <div style={{ ...sectionHeaderStyle, borderTop: '2px solid var(--pixel-border)' }}>
+            {t.agentDetailTranscript}
+            <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 'normal', marginLeft: 6, fontSize: '16px' }}>
+              ({transcript.length})
+            </span>
+          </div>
+          <div ref={transcriptScrollRef} style={{ ...scrollAreaStyle, maxHeight: 160 }}>
+            <div style={{ padding: '4px 10px' }}>
+              {transcript.slice(-20).map((entry, i) => (
+                <div
+                  key={`${entry.ts}-${i}`}
+                  style={{
+                    display: 'flex',
+                    gap: 4,
+                    fontSize: '14px',
+                    lineHeight: '16px',
+                    padding: '1px 0',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <span style={{ color: 'rgba(255,255,255,0.35)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                    {formatTime(entry.ts)}
+                  </span>
+                  <span style={{
+                    color: entry.role === 'assistant' ? 'var(--pixel-tool-task)'
+                      : entry.role === 'user' ? 'var(--pixel-tool-read)'
+                      : 'var(--pixel-status-permission)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    flex: 1,
+                  }}>
+                    {entry.summary}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 })

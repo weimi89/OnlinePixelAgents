@@ -432,7 +432,11 @@ function App() {
             agentGitBranches={agentGitBranches}
             agentStatusHistory={agentStatusHistory}
             agentGrowthData={agentGrowthData}
+            agentTranscripts={agentTranscripts}
+            agentTeams={agentTeams}
+            agentCliTypes={agentCliTypes}
             onClose={interaction.handleCloseDetailPanel}
+            onCloseAgent={interaction.handleCloseAgent}
           />
         )
       })()}

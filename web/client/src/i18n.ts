@@ -188,6 +188,8 @@ export const t = {
   agentDetailHistory: '狀態歷史',
   agentDetailClose: '關閉面板',
   agentDetailTimeline: '時間軸',
+  agentDetailTranscript: '對話記錄',
+  noTranscript: '尚無對話記錄',
   noHistory: '尚無歷史記錄',
 
   // UI 縮放

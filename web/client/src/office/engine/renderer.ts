@@ -726,10 +726,14 @@ export function renderLevelBadges(
   offsetX: number,
   offsetY: number,
   zoom: number,
+  hoveredAgentId: number | null,
+  selectedAgentId: number | null,
 ): void {
   if (zoom < 2) return // 縮放太小時不繪製
   for (const ch of characters) {
     if (ch.level <= 1 || ch.matrixEffect) continue
+    // 僅在懸停或選取時顯示
+    if (ch.id !== hoveredAgentId && ch.id !== selectedAgentId) continue
 
     const sittingOff = isSittingState(ch.state) ? CHARACTER_SITTING_OFFSET_PX : 0
     const fontSize = Math.max(8, Math.round(5 * zoom))
@@ -739,13 +743,13 @@ export function renderLevelBadges(
     const colorDef = LEVEL_BADGE_COLORS.find((c) => ch.level >= c.minLevel)
     const color = colorDef ? colorDef.color : '#888888'
 
-    const bx = Math.round(offsetX + (ch.x + 8) * zoom)
-    const by = Math.round(offsetY + (ch.y + sittingOff + LEVEL_BADGE_VERTICAL_OFFSET_PX) * zoom)
+    const bx = Math.round(offsetX + ch.x * zoom)
+    const by = Math.round(offsetY + (ch.y + sittingOff - LEVEL_BADGE_VERTICAL_OFFSET_PX) * zoom)
 
     ctx.save()
     ctx.font = `${fontSize}px "FS Pixel Sans", monospace`
     ctx.textAlign = 'center'
-    ctx.textBaseline = 'top'
+    ctx.textBaseline = 'bottom'
     // 暗色背景描邊
     ctx.strokeStyle = '#000000'
     ctx.lineWidth = Math.max(2, zoom * 0.6)
@@ -856,8 +860,8 @@ export function renderFrame(
   const hoveredId = selection?.hoveredAgentId ?? null
   renderScene(ctx, allFurniture, characters, offsetX, offsetY, zoom, selectedId, hoveredId)
 
-  // 等級徽章（在角色腳下）
-  renderLevelBadges(ctx, characters, offsetX, offsetY, zoom)
+  // 等級徽章（懸停/選取時在角色頭上）
+  renderLevelBadges(ctx, characters, offsetX, offsetY, zoom, hoveredId, selectedId)
 
   // 團隊徽章（在角色上方）
   renderTeamBadges(ctx, characters, offsetX, offsetY, zoom)

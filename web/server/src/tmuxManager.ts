@@ -51,10 +51,13 @@ export function createTmuxSession(
 
 /** 依名稱終止 tmux 會話 */
 export function killTmuxSession(sessionName: string): void {
-	spawnSync('tmux', ['kill-session', '-t', sessionName], {
+	const result = spawnSync('tmux', ['kill-session', '-t', sessionName], {
 		encoding: 'utf-8',
 		stdio: 'pipe',
 	});
+	if (result.status !== 0) {
+		console.warn(`[Pixel Agents] Failed to kill tmux session ${sessionName}: ${(result.stderr || '').trim()}`);
+	}
 }
 
 /** 檢查 tmux 會話是否仍然存活 */

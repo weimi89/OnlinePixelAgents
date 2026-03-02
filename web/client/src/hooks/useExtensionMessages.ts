@@ -6,6 +6,7 @@ import { extractToolName } from '../office/toolUtils.js'
 import { migrateLayoutColors } from '../office/layout/layoutSerializer.js'
 import { buildDynamicCatalog } from '../office/layout/furnitureCatalog.js'
 import { setFloorSprites } from '../office/floorTiles.js'
+import { invalidateTileLayer } from '../office/engine/renderer.js'
 import { setWallSprites } from '../office/wallTiles.js'
 import { setCharacterTemplates } from '../office/sprites/spriteData.js'
 import { vscode, onServerMessage } from '../socketApi.js'
@@ -439,6 +440,7 @@ function handleCharacterSpritesLoaded(msg: ServerMessage & { type: 'characterSpr
 function handleFloorTilesLoaded(msg: ServerMessage & { type: 'floorTilesLoaded' }): void {
   console.log(`[Webview] 收到 ${msg.sprites.length} 個地板花紋`)
   setFloorSprites(msg.sprites)
+  invalidateTileLayer()
 }
 
 function handleWallTilesLoaded(msg: ServerMessage & { type: 'wallTilesLoaded' }): void {

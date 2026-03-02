@@ -254,6 +254,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           officeState.getLayout().cols,
           officeState.getLayout().rows,
           overlay,
+          officeState.layoutVersion,
         )
         offsetRef.current = { x: offsetX, y: offsetY }
 

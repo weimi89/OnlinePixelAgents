@@ -38,7 +38,7 @@ export class OfficeState {
   walkableTiles: Array<{ col: number; row: number }>
   /** "col,row" → seatUid 快速查找索引 */
   private seatTileIndex: Map<string, string> = new Map()
-  private furnitureDirty = true
+  private furnitureRebuildScheduled = false
   characters: Map<number, Character> = new Map()
   selectedAgentId: number | null = null
   cameraFollowId: number | null = null
@@ -49,6 +49,8 @@ export class OfficeState {
   /** 反向查找：子代理角色 ID → 父代理資訊 */
   subagentMeta: Map<number, { parentAgentId: number; parentToolId: string }> = new Map()
   private nextSubagentId = -1
+  /** 佈局版本計數器，每次佈局變更時遞增（用於渲染快取失效） */
+  layoutVersion = 0
   /** 當前日夜階段 */
   dayPhase: DayPhase = 'day'
   /** 前一次的日夜階段（偵測變化以重建家具） */
@@ -76,6 +78,7 @@ export class OfficeState {
    *  @param shift 當網格向左/上擴展時套用的可選位移 */
   rebuildFromLayout(layout: OfficeLayout, shift?: { col: number; row: number }): void {
     this.layout = layout
+    this.layoutVersion++
     this.tileMap = layoutToTileMap(layout)
     this.seats = layoutToSeats(layout.furniture)
     this.rebuildSeatTileIndex()
@@ -579,13 +582,22 @@ export class OfficeState {
         ch.path = []
         ch.moveProgress = 0
       }
-      this.furnitureDirty = true
+      this.scheduleFurnitureRebuild()
     }
+  }
+
+  /** 排程家具實例重建，合併同一事件循環中的多次觸發 */
+  private scheduleFurnitureRebuild(): void {
+    if (this.furnitureRebuildScheduled) return
+    this.furnitureRebuildScheduled = true
+    queueMicrotask(() => {
+      this.furnitureRebuildScheduled = false
+      this.rebuildFurnitureInstances()
+    })
   }
 
   /** 重建家具實例並套用自動狀態（活躍代理將電子設備切換為 ON） */
   private rebuildFurnitureInstances(): void {
-    this.furnitureDirty = false
     // 收集活躍代理面對書桌的格位
     const autoOnTiles = new Set<string>()
     for (const ch of this.characters.values()) {
@@ -742,7 +754,7 @@ export class OfficeState {
     this.dayPhase = phase
     if (phase !== this.prevDayPhase) {
       this.prevDayPhase = phase
-      this.furnitureDirty = true
+      this.scheduleFurnitureRebuild()
     }
   }
 
@@ -781,10 +793,6 @@ export class OfficeState {
   }
 
   update(dt: number): void {
-    if (this.furnitureDirty) {
-      this.rebuildFurnitureInstances()
-    }
-
     // 建構 UpdateContext（每幀共享）
     const furnitureMap = this.buildFurnitureMap()
     const ctx: UpdateContext = {

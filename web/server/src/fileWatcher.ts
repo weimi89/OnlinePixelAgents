@@ -8,6 +8,10 @@ import { resolveFloorForProject } from './floorAssignment.js';
 import { getTeamName } from './teamNameStore.js';
 import { FILE_WATCHER_POLL_INTERVAL_MS, PROJECT_SCAN_INTERVAL_MS, ACTIVE_JSONL_MAX_AGE_MS, STALE_AGENT_TIMEOUT_MS, DEFAULT_FLOOR_ID } from './constants.js';
 
+/** 每代理的 readNewLines 節流時間戳，防止 fs.watch + 輪詢雙重觸發 */
+const lastReadTime = new Map<number, number>();
+const READ_THROTTLE_MS = 100;
+
 /** 啟動檔案監視（fs.watch + 輪詢備援），偵測 JSONL 檔案變更 */
 export function startFileWatching(
 	agentId: number,
@@ -41,7 +45,15 @@ export function readNewLines(
 ): void {
 	const { agents, waitingTimers, permissionTimers } = ctx;
 	const agent = agents.get(agentId);
-	if (!agent) return;
+	if (!agent) {
+		lastReadTime.delete(agentId);
+		return;
+	}
+	// 節流：防止 fs.watch + 輪詢在短時間內雙重觸發
+	const now = Date.now();
+	const lastRead = lastReadTime.get(agentId) || 0;
+	if (now - lastRead < READ_THROTTLE_MS) return;
+	lastReadTime.set(agentId, now);
 	const sender = ctx.floorSender(agent.floorId);
 	try {
 		const stat = fs.statSync(agent.jsonlFile);

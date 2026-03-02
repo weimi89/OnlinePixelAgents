@@ -63,6 +63,73 @@ import {
   TEAM_CONNECTION_DASH,
 } from '../../constants.js'
 
+// ── 靜態磚層離屏 Canvas 快取 ──────────────────────────────
+let tileLayerCanvas: OffscreenCanvas | HTMLCanvasElement | null = null
+let tileLayerCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null
+let tileLayerKey = ''
+
+function createOffscreenCanvas(w: number, h: number): OffscreenCanvas | HTMLCanvasElement {
+  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h)
+  const c = document.createElement('canvas')
+  c.width = w; c.height = h
+  return c
+}
+
+/** 重建離屏磚層 Canvas */
+function rebuildTileLayer(
+  tileMap: TileTypeVal[][],
+  zoom: number,
+  tileColors?: Array<FloorColor | null>,
+  cols?: number,
+): void {
+  const tmRows = tileMap.length
+  const tmCols = tmRows > 0 ? tileMap[0].length : 0
+  const layoutCols = cols ?? tmCols
+  const s = TILE_SIZE * zoom
+  const w = tmCols * s
+  const h = tmRows * s
+  if (w === 0 || h === 0) { tileLayerCanvas = null; return }
+
+  if (!tileLayerCanvas || tileLayerCanvas.width !== w || tileLayerCanvas.height !== h) {
+    tileLayerCanvas = createOffscreenCanvas(w, h)
+    tileLayerCtx = tileLayerCanvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
+  }
+  if (!tileLayerCtx) return
+
+  const useSpriteFloors = hasFloorSprites()
+  tileLayerCtx.clearRect(0, 0, w, h)
+
+  for (let r = 0; r < tmRows; r++) {
+    for (let c = 0; c < tmCols; c++) {
+      const tile = tileMap[r][c]
+      if (tile === TileType.VOID) continue
+
+      if (tile === TileType.WALL || !useSpriteFloors) {
+        if (tile === TileType.WALL) {
+          const colorIdx = r * layoutCols + c
+          const wallColor = tileColors?.[colorIdx]
+          tileLayerCtx.fillStyle = wallColor ? wallColorToHex(wallColor) : WALL_COLOR
+        } else {
+          tileLayerCtx.fillStyle = FALLBACK_FLOOR_COLOR
+        }
+        tileLayerCtx.fillRect(c * s, r * s, s, s)
+        continue
+      }
+
+      const colorIdx = r * layoutCols + c
+      const color = tileColors?.[colorIdx] ?? { h: 0, s: 0, b: 0, c: 0 }
+      const sprite = getColorizedFloorSprite(tile, color)
+      const cached = getCachedSprite(sprite, zoom)
+      tileLayerCtx.drawImage(cached, c * s, r * s)
+    }
+  }
+}
+
+/** 手動使磚層快取失效（佈局編輯時呼叫） */
+export function invalidateTileLayer(): void {
+  tileLayerKey = ''
+}
+
 // ── 渲染函式 ────────────────────────────────────────────
 
 export function renderTileGrid(
@@ -73,43 +140,16 @@ export function renderTileGrid(
   zoom: number,
   tileColors?: Array<FloorColor | null>,
   cols?: number,
+  layoutVersion?: number,
 ): void {
-  const s = TILE_SIZE * zoom
-  const useSpriteFloors = hasFloorSprites()
-  const tmRows = tileMap.length
-  const tmCols = tmRows > 0 ? tileMap[0].length : 0
-  const layoutCols = cols ?? tmCols
-
-  // 地板磚 + 牆壁底色
-  for (let r = 0; r < tmRows; r++) {
-    for (let c = 0; c < tmCols; c++) {
-      const tile = tileMap[r][c]
-
-      // 完全跳過 VOID 格（透明）
-      if (tile === TileType.VOID) continue
-
-      if (tile === TileType.WALL || !useSpriteFloors) {
-        // 牆磚或備選：純色填充
-        if (tile === TileType.WALL) {
-          const colorIdx = r * layoutCols + c
-          const wallColor = tileColors?.[colorIdx]
-          ctx.fillStyle = wallColor ? wallColorToHex(wallColor) : WALL_COLOR
-        } else {
-          ctx.fillStyle = FALLBACK_FLOOR_COLOR
-        }
-        ctx.fillRect(offsetX + c * s, offsetY + r * s, s, s)
-        continue
-      }
-
-      // 地板磚：取得著色後的精靈圖
-      const colorIdx = r * layoutCols + c
-      const color = tileColors?.[colorIdx] ?? { h: 0, s: 0, b: 0, c: 0 }
-      const sprite = getColorizedFloorSprite(tile, color)
-      const cached = getCachedSprite(sprite, zoom)
-      ctx.drawImage(cached, offsetX + c * s, offsetY + r * s)
-    }
+  const key = `${tileMap.length}:${tileMap[0]?.length ?? 0}:${zoom}:${layoutVersion ?? 0}`
+  if (key !== tileLayerKey) {
+    rebuildTileLayer(tileMap, zoom, tileColors, cols)
+    tileLayerKey = key
   }
-
+  if (tileLayerCanvas) {
+    ctx.drawImage(tileLayerCanvas, offsetX, offsetY)
+  }
 }
 
 interface ZDrawable {
@@ -715,6 +755,7 @@ export function renderFrame(
   layoutCols?: number,
   layoutRows?: number,
   dayNightOverlay?: { color: string; alpha: number },
+  layoutVersion?: number,
 ): { offsetX: number; offsetY: number } {
   // 清除
   ctx.clearRect(0, 0, canvasWidth, canvasHeight)
@@ -729,8 +770,8 @@ export function renderFrame(
   const offsetX = Math.floor((canvasWidth - mapW) / 2) + Math.round(panX)
   const offsetY = Math.floor((canvasHeight - mapH) / 2) + Math.round(panY)
 
-  // 繪製磚塊（地板 + 牆壁底色）
-  renderTileGrid(ctx, tileMap, offsetX, offsetY, zoom, tileColors, layoutCols)
+  // 繪製磚塊（地板 + 牆壁底色）— 使用離屏快取
+  renderTileGrid(ctx, tileMap, offsetX, offsetY, zoom, tileColors, layoutCols, layoutVersion)
 
   // 座位指示器（在家具/角色下方，在地板上方）
   if (selection) {

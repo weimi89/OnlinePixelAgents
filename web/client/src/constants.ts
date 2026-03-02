@@ -245,6 +245,12 @@ export const LEVEL_GLOW_COLORS: Array<{ minLevel: number; color: string; alpha: 
 export const LEVEL_BADGE_FONT_SIZE = 5
 export const LEVEL_BADGE_VERTICAL_OFFSET_PX = 34
 
+// ── CLI 類型徽章顏色 ──────────────────────────────────────────
+export const CLI_TYPE_BADGE_COLORS: Record<string, string> = {
+  codex: '#4ade80',   // 綠色
+  gemini: '#60a5fa',  // 藍色
+}
+
 // ── 團隊視覺化 ────────────────────────────────────────────────
 export const TEAM_COLORS = [
   '#ff6b6b', // 紅

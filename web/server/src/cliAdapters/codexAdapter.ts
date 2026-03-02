@@ -15,7 +15,7 @@ export const codexAdapter: CLIAdapter = {
 	name: 'codex',
 
 	getProjectsRoot() {
-		return path.join(os.homedir(), '.codex', 'projects');
+		return path.join(os.homedir(), '.codex', 'sessions');
 	},
 
 	isAvailable() {

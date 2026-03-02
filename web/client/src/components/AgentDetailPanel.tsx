@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import type { ToolActivity } from '../office/types.js'
 import { extractToolName } from '../office/toolUtils.js'
-import { TOOL_TYPE_COLORS, LEVEL_BADGE_COLORS } from '../constants.js'
+import { TOOL_TYPE_COLORS, LEVEL_BADGE_COLORS, CLI_TYPE_BADGE_COLORS } from '../constants.js'
 import { AgentTimeline } from './AgentTimeline.js'
 import { formatModelName } from '../utils.js'
 import { vscode } from '../socketApi.js'
@@ -291,18 +291,45 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
         <span style={{ fontSize: '22px', color: 'var(--pixel-text)', fontWeight: 'bold' }}>
           {t.agentDetail}
         </span>
-        <button
-          style={{
-            ...closeBtnStyle,
-            color: closeHovered ? 'var(--pixel-close-hover)' : 'var(--pixel-close-text)',
-          }}
-          onClick={handleClose}
-          onMouseEnter={() => setCloseHovered(true)}
-          onMouseLeave={() => setCloseHovered(false)}
-          title={t.agentDetailClose}
-        >
-          X
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+          {onCloseAgent && !agent?.isRemote && (
+            <button
+              onClick={() => onCloseAgent(agentId)}
+              style={{
+                background: 'none',
+                border: '1px solid var(--pixel-close-text)',
+                color: 'var(--pixel-close-text)',
+                cursor: 'pointer',
+                padding: '1px 6px',
+                fontSize: '14px',
+                borderRadius: 0,
+                lineHeight: '18px',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.color = 'var(--pixel-close-hover)'
+                ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--pixel-close-hover)'
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.color = 'var(--pixel-close-text)'
+                ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--pixel-close-text)'
+              }}
+            >
+              {t.closeAgent}
+            </button>
+          )}
+          <button
+            style={{
+              ...closeBtnStyle,
+              color: closeHovered ? 'var(--pixel-close-hover)' : 'var(--pixel-close-text)',
+            }}
+            onClick={handleClose}
+            onMouseEnter={() => setCloseHovered(true)}
+            onMouseLeave={() => setCloseHovered(false)}
+            title={t.agentDetailClose}
+          >
+            X
+          </button>
+        </div>
       </div>
 
       {/* ---- 基本資訊（固定區域，不捲動） ---- */}
@@ -361,40 +388,14 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
             <span style={{
               fontSize: '14px',
               padding: '0 4px',
-              border: '1px solid var(--pixel-accent)',
-              color: 'var(--pixel-accent)',
+              border: `1px solid ${CLI_TYPE_BADGE_COLORS[cliType] || 'var(--pixel-accent)'}`,
+              color: CLI_TYPE_BADGE_COLORS[cliType] || 'var(--pixel-accent)',
             }}>
               {cliType.toUpperCase()}
             </span>
           </div>
         )}
 
-        {onCloseAgent && !agent?.isRemote && (
-          <div style={{ padding: '4px 10px' }}>
-            <button
-              onClick={() => onCloseAgent(agentId)}
-              style={{
-                background: 'none',
-                border: '1px solid var(--pixel-close-text)',
-                color: 'var(--pixel-close-text)',
-                cursor: 'pointer',
-                padding: '2px 8px',
-                fontSize: '16px',
-                borderRadius: 0,
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.color = 'var(--pixel-close-hover)'
-                ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--pixel-close-hover)'
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.color = 'var(--pixel-close-text)'
-                ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--pixel-close-text)'
-              }}
-            >
-              {t.closeAgent}
-            </button>
-          </div>
-        )}
       </div>
 
       {/* ---- 成長資訊 ---- */}

@@ -40,15 +40,48 @@ export function getProjectDirsForCli(adapter: CLIAdapter): string[] {
 	const projectsRoot = adapter.getProjectsRoot();
 	const ignoredPatterns = adapter.ignoredDirPatterns();
 	try {
-		const entries = fs.readdirSync(projectsRoot, { withFileTypes: true });
-		return entries
-			.filter(e => e.isDirectory())
-			.filter(e => !ignoredPatterns.some(p => e.name.includes(p)))
-			.map(e => path.join(projectsRoot, e.name))
+		return findJsonlDirs(projectsRoot, ignoredPatterns)
 			.filter(dir => !isProjectExcluded(dir));
 	} catch {
 		return [];
 	}
+}
+
+/** 從根目錄遞迴找出「直接包含 JSONL 檔案」的資料夾 */
+function findJsonlDirs(rootDir: string, ignoredPatterns: string[]): string[] {
+	const MAX_SCAN_DEPTH = 4;
+	const found = new Set<string>();
+	const stack: Array<{ dir: string; depth: number }> = [{ dir: rootDir, depth: 0 }];
+
+	while (stack.length > 0) {
+		const current = stack.pop();
+		if (!current) continue;
+
+		let entries: fs.Dirent[];
+		try {
+			entries = fs.readdirSync(current.dir, { withFileTypes: true });
+		} catch {
+			continue;
+		}
+
+		let hasJsonl = false;
+		for (const entry of entries) {
+			if (entry.isFile() && entry.name.endsWith('.jsonl')) {
+				hasJsonl = true;
+				continue;
+			}
+			if (!entry.isDirectory()) continue;
+			if (ignoredPatterns.some(p => entry.name.includes(p))) continue;
+			if (current.depth >= MAX_SCAN_DEPTH) continue;
+			stack.push({ dir: path.join(current.dir, entry.name), depth: current.depth + 1 });
+		}
+
+		if (hasJsonl) {
+			found.add(current.dir);
+		}
+	}
+
+	return [...found];
 }
 
 /** 取得所有已註冊 CLI 的專案目錄清單 */

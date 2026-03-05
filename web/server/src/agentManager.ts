@@ -29,6 +29,17 @@ export function extractProjectName(projectDir: string): string {
 	return parts[parts.length - 1] || dirName;
 }
 
+/** 從會話檔案提取專案名稱（使用 CLI adapter 的自訂邏輯，若有的話） */
+export function extractProjectNameFromFile(filePath: string, projectDir: string): string {
+	const cliType = detectCliTypeFromPath(projectDir);
+	const adapter = getAdapter(cliType);
+	if (adapter?.extractProjectName) {
+		const name = adapter.extractProjectName(filePath);
+		if (name) return name;
+	}
+	return extractProjectName(projectDir);
+}
+
 /** 從工作目錄路徑推導出 Claude 專案目錄路徑 */
 export function getProjectDirPath(cwd: string): string {
 	const dirName = cwd.replace(/[^a-zA-Z0-9-]/g, '-');
@@ -37,6 +48,16 @@ export function getProjectDirPath(cwd: string): string {
 
 /** 取得指定 CLI 類型的所有專案目錄清單（排除忽略模式和排除清單） */
 export function getProjectDirsForCli(adapter: CLIAdapter): string[] {
+	// 若 adapter 提供自訂掃描邏輯，使用它
+	if (adapter.scanSessionFiles) {
+		try {
+			return adapter.scanSessionFiles()
+				.map(r => r.dir)
+				.filter(dir => !isProjectExcluded(dir));
+		} catch {
+			return [];
+		}
+	}
 	const projectsRoot = adapter.getProjectsRoot();
 	const ignoredPatterns = adapter.ignoredDirPatterns();
 	try {

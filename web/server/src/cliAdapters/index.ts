@@ -33,6 +33,24 @@ export interface CLIAdapter {
 
 	/** 掃描時忽略的目錄名稱模式 */
 	ignoredDirPatterns(): string[];
+
+	/** 會話檔案副檔名（預設 '.jsonl'） */
+	sessionFileExtension?(): string;
+
+	/** 此 CLI 是否使用增量讀取（JSONL）或全量讀取（JSON）。預設 'incremental' */
+	readMode?(): 'incremental' | 'full-reload';
+
+	/**
+	 * 自訂的會話檔案掃描邏輯（覆蓋 findJsonlDirs 的預設行為）。
+	 * 回傳 { dir: projectDir, files: filePath[] }[] — dir 作為 projectDir，files 為會話檔案路徑。
+	 */
+	scanSessionFiles?(): Array<{ dir: string; files: string[] }>;
+
+	/**
+	 * 從會話檔案提取專案名稱（可選）。
+	 * 若不提供，使用 projectDir 最後一段目錄名稱。
+	 */
+	extractProjectName?(filePath: string): string | null;
 }
 
 /** 已註冊的適配器 */

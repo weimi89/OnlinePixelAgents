@@ -54,28 +54,55 @@ export function appendStatusHistory(
 	}
 }
 
-/** 解析單行 JSONL 轉錄記錄，更新代理狀態並發送對應訊息 */
+/** 解析單行轉錄記錄，根據 CLI 類型分派到對應的解析函式 */
 export function processTranscriptLine(
 	agentId: number,
 	line: string,
+	ctx: AgentContext,
+): void {
+	const { agents } = ctx;
+	const agent = agents.get(agentId);
+	if (!agent) return;
+	try {
+		const record = JSON.parse(line);
+
+		// CLI 特定分派
+		if (agent.cliType === 'codex') {
+			processCodexLine(agentId, record, ctx);
+			return;
+		}
+		if (agent.cliType === 'gemini') {
+			processGeminiMessage(agentId, record, ctx);
+			return;
+		}
+
+		processClaudeLine(agentId, record, ctx);
+	} catch {
+		// 忽略格式錯誤的行
+	}
+}
+
+/** 解析 Claude JSONL 轉錄記錄 */
+function processClaudeLine(
+	agentId: number,
+	record: Record<string, unknown>,
 	ctx: AgentContext,
 ): void {
 	const { agents, waitingTimers, permissionTimers, progressExtensions } = ctx;
 	const agent = agents.get(agentId);
 	if (!agent) return;
 	const sender = ctx.floorSender(agent.floorId);
-	try {
-		const record = JSON.parse(line);
+		const msg = record.message as Record<string, unknown> | undefined;
 
-		if (record.type === 'assistant' && Array.isArray(record.message?.content)) {
+		if (record.type === 'assistant' && Array.isArray(msg?.content)) {
 			// 從助手記錄中提取模型名稱
-			const model = record.message?.model as string | undefined;
+			const model = msg?.model as string | undefined;
 			if (model && agent.model !== model) {
 				agent.model = model;
 				sender?.postMessage({ type: 'agentModel', id: agentId, model });
 			}
 
-			const blocks = record.message.content as Array<{
+			const blocks = msg.content as Array<{
 				type: string; id?: string; name?: string; input?: Record<string, unknown>;
 			}>;
 
@@ -153,7 +180,7 @@ export function processTranscriptLine(
 		} else if (record.type === 'progress') {
 			processProgressRecord(agentId, record, ctx);
 		} else if (record.type === 'user') {
-			const content = record.message?.content;
+			const content = msg?.content;
 			if (Array.isArray(content)) {
 				const blocks = content as Array<{ type: string; tool_use_id?: string }>;
 				const hasToolResult = blocks.some(b => b.type === 'tool_result');
@@ -256,9 +283,6 @@ export function processTranscriptLine(
 			appendStatusHistory(agent, 'waiting', 'turn_complete');
 			appendTranscript(agentId, agent, 'system', 'Turn complete', sender);
 		}
-	} catch {
-		// 忽略格式錯誤的行
-	}
 }
 
 /** 處理 progress 類型記錄（子代理工具啟動/完成、bash/mcp 進度） */
@@ -377,5 +401,278 @@ function processProgressRecord(
 		if (stillHasNonExempt) {
 			startPermissionTimer(agentId, agents, permissionTimers, PERMISSION_EXEMPT_TOOLS, sender);
 		}
+	}
+}
+
+// ── Codex 解析器 ─────────────────────────────────────────────
+
+/** 解析 Codex JSONL 記錄，映射至標準代理事件 */
+function processCodexLine(
+	agentId: number,
+	record: Record<string, unknown>,
+	ctx: AgentContext,
+): void {
+	const { agents, waitingTimers, permissionTimers, progressExtensions } = ctx;
+	const agent = agents.get(agentId);
+	if (!agent) return;
+	const sender = ctx.floorSender(agent.floorId);
+
+	const recordType = record.type as string;
+	const payload = record.payload as Record<string, unknown> | undefined;
+	if (!payload) return;
+
+	const payloadType = payload.type as string | undefined;
+
+	// 模型偵測：從 turn_context 中提取
+	if (recordType === 'turn_context') {
+		const model = payload.model as string | undefined;
+		if (model && agent.model !== model) {
+			agent.model = model;
+			sender?.postMessage({ type: 'agentModel', id: agentId, model });
+		}
+		return;
+	}
+
+	// 也從 session_meta 取得模型資訊
+	if (recordType === 'session_meta') {
+		const model = payload.model_provider as string | undefined;
+		if (model && !agent.model) {
+			agent.model = model;
+			sender?.postMessage({ type: 'agentModel', id: agentId, model });
+		}
+		return;
+	}
+
+	// 工具呼叫：function_call
+	if (recordType === 'response_item' && payloadType === 'function_call') {
+		const toolName = payload.name as string || '';
+		const callId = payload.call_id as string || '';
+		if (!callId) return;
+
+		cancelWaitingTimer(agentId, waitingTimers);
+		agent.isWaiting = false;
+		agent.hadToolsInTurn = true;
+		sender?.postMessage({ type: 'agentThinking', id: agentId, thinking: false });
+		sender?.postMessage({ type: 'agentStatus', id: agentId, status: 'active' });
+		appendStatusHistory(agent, 'active', 'tool_use');
+
+		// 解析 arguments（Codex 用 JSON 字串）
+		let toolInput: Record<string, unknown> = {};
+		if (typeof payload.arguments === 'string') {
+			try { toolInput = JSON.parse(payload.arguments as string); } catch { /* 忽略 */ }
+		} else if (typeof payload.arguments === 'object' && payload.arguments) {
+			toolInput = payload.arguments as Record<string, unknown>;
+		}
+
+		const status = formatToolStatus(toolName, toolInput);
+		console.log(`[Pixel Agents] Agent ${agentId} (codex) tool start: ${callId} ${status}`);
+		agent.activeToolIds.add(callId);
+		agent.activeToolStatuses.set(callId, status);
+		agent.activeToolNames.set(callId, toolName);
+
+		if (!PERMISSION_EXEMPT_TOOLS.has(toolName)) {
+			progressExtensions.delete(agentId);
+			startPermissionTimer(agentId, agents, permissionTimers, PERMISSION_EXEMPT_TOOLS, sender);
+		}
+
+		sender?.postMessage({ type: 'agentToolStart', id: agentId, toolId: callId, status });
+		recordToolCall(agentId, agent, toolName, sender);
+		appendTranscript(agentId, agent, 'assistant', status, sender);
+		return;
+	}
+
+	// 工具結果：function_call_output
+	if (recordType === 'response_item' && payloadType === 'function_call_output') {
+		const callId = payload.call_id as string || '';
+		if (!callId || !agent.activeToolIds.has(callId)) return;
+
+		console.log(`[Pixel Agents] Agent ${agentId} (codex) tool done: ${callId}`);
+		const completedName = agent.activeToolNames.get(callId);
+		if (completedName) {
+			incrementToolCall(completedName);
+			appendStatusHistory(agent, 'tool_done', completedName);
+		}
+		agent.activeToolIds.delete(callId);
+		agent.activeToolStatuses.delete(callId);
+		agent.activeToolNames.delete(callId);
+
+		const toolId = callId;
+		setTimeout(() => {
+			sender?.postMessage({ type: 'agentToolDone', id: agentId, toolId });
+		}, TOOL_DONE_DELAY_MS);
+
+		if (agent.activeToolIds.size === 0) {
+			agent.hadToolsInTurn = false;
+		}
+		return;
+	}
+
+	// 推理（thinking）
+	if (recordType === 'response_item' && payloadType === 'reasoning') {
+		sender?.postMessage({ type: 'agentThinking', id: agentId, thinking: true });
+		appendStatusHistory(agent, 'thinking');
+		appendTranscript(agentId, agent, 'assistant', '[thinking]', sender);
+		return;
+	}
+
+	// 使用者訊息（新回合開始）
+	if (recordType === 'event_msg' && payloadType === 'user_message') {
+		cancelWaitingTimer(agentId, waitingTimers);
+		clearAgentActivity(agent, agentId, permissionTimers, sender, progressExtensions);
+		agent.hadToolsInTurn = false;
+		appendStatusHistory(agent, 'user_prompt');
+		return;
+	}
+
+	// 任務完成（回合結束）
+	if (recordType === 'event_msg' && payloadType === 'task_complete') {
+		cancelWaitingTimer(agentId, waitingTimers);
+		cancelPermissionTimer(agentId, permissionTimers);
+		sender?.postMessage({ type: 'agentThinking', id: agentId, thinking: false });
+
+		if (agent.activeToolIds.size > 0) {
+			agent.activeToolIds.clear();
+			agent.activeToolStatuses.clear();
+			agent.activeToolNames.clear();
+			sender?.postMessage({ type: 'agentToolsClear', id: agentId });
+		}
+
+		agent.isWaiting = true;
+		agent.permissionSent = false;
+		agent.hadToolsInTurn = false;
+		sender?.postMessage({ type: 'agentStatus', id: agentId, status: 'waiting' });
+		recordTurnComplete(agentId, agent, sender);
+		appendStatusHistory(agent, 'waiting', 'turn_complete');
+		appendTranscript(agentId, agent, 'system', 'Turn complete', sender);
+		return;
+	}
+}
+
+// ── Gemini 解析器 ────────────────────────────────────────────
+
+/** 解析 Gemini JSON 會話訊息，映射至標準代理事件 */
+function processGeminiMessage(
+	agentId: number,
+	record: Record<string, unknown>,
+	ctx: AgentContext,
+): void {
+	const { agents, waitingTimers, permissionTimers, progressExtensions } = ctx;
+	const agent = agents.get(agentId);
+	if (!agent) return;
+	const sender = ctx.floorSender(agent.floorId);
+
+	const msgType = record.type as string;
+
+	// Gemini 回覆
+	if (msgType === 'gemini') {
+		const model = record.model as string | undefined;
+		if (model && agent.model !== model) {
+			agent.model = model;
+			sender?.postMessage({ type: 'agentModel', id: agentId, model });
+		}
+
+		// 先清除前一輪的活躍 toolCalls（Gemini 沒有明確的 tool_result）
+		if (agent.activeToolIds.size > 0) {
+			for (const toolId of agent.activeToolIds) {
+				const completedName = agent.activeToolNames.get(toolId);
+				if (completedName) {
+					incrementToolCall(completedName);
+					appendStatusHistory(agent, 'tool_done', completedName);
+				}
+				sender?.postMessage({ type: 'agentToolDone', id: agentId, toolId });
+			}
+			agent.activeToolIds.clear();
+			agent.activeToolStatuses.clear();
+			agent.activeToolNames.clear();
+		}
+
+		// 處理 thoughts（thinking）
+		const thoughts = record.thoughts as Array<Record<string, unknown>> | undefined;
+		if (thoughts && thoughts.length > 0) {
+			sender?.postMessage({ type: 'agentThinking', id: agentId, thinking: true });
+			const totalLength = thoughts.reduce((sum, t) => {
+				const desc = t.description as string | undefined;
+				return sum + (desc?.length ?? 0);
+			}, 0);
+			if (totalLength > THINKING_DEPTH_THRESHOLD) {
+				sender?.postMessage({ type: 'agentEmote', id: agentId, emote: 'idea' });
+			}
+		}
+
+		// 處理 toolCalls
+		const toolCalls = record.toolCalls as Array<Record<string, unknown>> | undefined;
+		if (toolCalls && toolCalls.length > 0) {
+			cancelWaitingTimer(agentId, waitingTimers);
+			agent.isWaiting = false;
+			agent.hadToolsInTurn = true;
+			sender?.postMessage({ type: 'agentThinking', id: agentId, thinking: false });
+			sender?.postMessage({ type: 'agentStatus', id: agentId, status: 'active' });
+			appendStatusHistory(agent, 'active', 'tool_use');
+
+			let hasNonExempt = false;
+			for (const tc of toolCalls) {
+				const toolName = tc.name as string || '';
+				const callId = tc.id as string || `gemini_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+				const toolInput = (tc.args || {}) as Record<string, unknown>;
+
+				const status = formatToolStatus(toolName, toolInput);
+				console.log(`[Pixel Agents] Agent ${agentId} (gemini) tool start: ${callId} ${status}`);
+				agent.activeToolIds.add(callId);
+				agent.activeToolStatuses.set(callId, status);
+				agent.activeToolNames.set(callId, toolName);
+
+				if (!PERMISSION_EXEMPT_TOOLS.has(toolName)) {
+					hasNonExempt = true;
+				}
+
+				sender?.postMessage({ type: 'agentToolStart', id: agentId, toolId: callId, status });
+				recordToolCall(agentId, agent, toolName, sender);
+			}
+
+			if (hasNonExempt) {
+				progressExtensions.delete(agentId);
+				startPermissionTimer(agentId, agents, permissionTimers, PERMISSION_EXEMPT_TOOLS, sender);
+			}
+
+			const lastStatus = [...agent.activeToolStatuses.values()].pop() || 'Using tools';
+			appendTranscript(agentId, agent, 'assistant', lastStatus, sender);
+		} else {
+			// 無 toolCalls — 純文字回覆，代表回合可能結束
+			sender?.postMessage({ type: 'agentThinking', id: agentId, thinking: false });
+			const content = record.content as string | undefined;
+			if (content) {
+				agent.isWaiting = true;
+				agent.hadToolsInTurn = false;
+				sender?.postMessage({ type: 'agentStatus', id: agentId, status: 'waiting' });
+				recordTurnComplete(agentId, agent, sender);
+				appendStatusHistory(agent, 'waiting', 'turn_complete');
+				const trimmed = content.trim();
+				appendTranscript(agentId, agent, 'assistant', trimmed.length > 60 ? trimmed.slice(0, 60) + '\u2026' : trimmed, sender);
+			}
+		}
+		return;
+	}
+
+	// 使用者訊息
+	if (msgType === 'user') {
+		cancelWaitingTimer(agentId, waitingTimers);
+		clearAgentActivity(agent, agentId, permissionTimers, sender, progressExtensions);
+		agent.hadToolsInTurn = false;
+		appendStatusHistory(agent, 'user_prompt');
+
+		const contentArr = record.content as Array<Record<string, unknown>> | undefined;
+		if (contentArr && contentArr.length > 0) {
+			const text = contentArr.map(c => (c.text as string) || '').join(' ').trim();
+			if (text) {
+				appendTranscript(agentId, agent, 'user', text.length > 60 ? text.slice(0, 60) + '\u2026' : text, sender);
+			}
+		}
+		return;
+	}
+
+	// 錯誤訊息
+	if (msgType === 'error') {
+		appendStatusHistory(agent, 'error');
+		return;
 	}
 }

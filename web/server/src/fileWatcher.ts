@@ -3,10 +3,11 @@ import * as path from 'path';
 import type { AgentContext, AgentState } from './types.js';
 import { cancelWaitingTimer, cancelPermissionTimer, clearAgentActivity } from './timerManager.js';
 import { processTranscriptLine } from './transcriptParser.js';
-import { removeAgent, extractProjectName, detectCliTypeFromPath, loadPersistedAgents } from './agentManager.js';
+import { removeAgent, extractProjectNameFromFile, detectCliTypeFromPath, loadPersistedAgents } from './agentManager.js';
 import { DEFAULT_GROWTH, restoreGrowth, recordSessionStart } from './growthSystem.js';
 import { resolveFloorForProject } from './floorAssignment.js';
 import { getTeamName } from './teamNameStore.js';
+import { getAdapter } from './cliAdapters/index.js';
 import { FILE_WATCHER_POLL_INTERVAL_MS, PROJECT_SCAN_INTERVAL_MS, ACTIVE_JSONL_MAX_AGE_MS, STALE_AGENT_TIMEOUT_MS, DEFAULT_FLOOR_ID } from './constants.js';
 
 /** 每代理的 readNewLines 節流時間戳，防止 fs.watch + 輪詢雙重觸發 */
@@ -53,7 +54,7 @@ export function startFileWatching(
 	pollingTimers.set(agentId, interval);
 }
 
-/** 讀取 JSONL 檔案中的新增行，逐行交給轉錄解析器處理 */
+/** 讀取會話檔案中的新資料，逐行（JSONL）或全量（JSON）交給轉錄解析器處理 */
 export function readNewLines(
 	agentId: number,
 	ctx: AgentContext,
@@ -64,6 +65,13 @@ export function readNewLines(
 		lastReadTime.delete(agentId);
 		return;
 	}
+
+	// Gemini 使用全量 JSON 讀取模式
+	if (agent.cliType === 'gemini') {
+		readGeminiSession(agentId, ctx);
+		return;
+	}
+
 	// 節流：防止 fs.watch + 輪詢在短時間內雙重觸發
 	const now = Date.now();
 	const lastRead = lastReadTime.get(agentId) || 0;
@@ -106,6 +114,53 @@ export function readNewLines(
 	}
 }
 
+/** Gemini 全量讀取：讀取整個 JSON 會話檔，只處理新增的訊息 */
+function readGeminiSession(agentId: number, ctx: AgentContext): void {
+	const { agents, waitingTimers, permissionTimers } = ctx;
+	const agent = agents.get(agentId);
+	if (!agent) return;
+
+	// 節流
+	const now = Date.now();
+	const lastRead = lastReadTime.get(agentId) || 0;
+	if (now - lastRead < READ_THROTTLE_MS) return;
+	lastReadTime.set(agentId, now);
+
+	const sender = ctx.floorSender(agent.floorId);
+	try {
+		// 先檢查檔案是否有變更（用大小變化判斷）
+		const stat = fs.statSync(agent.jsonlFile);
+		// 用 lineBuffer 儲存上次的檔案大小（字串形式複用欄位）
+		const lastSize = parseInt(agent.lineBuffer || '0', 10);
+		if (stat.size === lastSize) return;
+		agent.lineBuffer = String(stat.size);
+
+		const content = fs.readFileSync(agent.jsonlFile, 'utf-8');
+		const session = JSON.parse(content);
+		const messages = session.messages as Array<Record<string, unknown>> || [];
+
+		// fileOffset 在 Gemini 模式下表示「已處理的訊息數量」
+		const newMessages = messages.slice(agent.fileOffset);
+		agent.fileOffset = messages.length;
+
+		if (newMessages.length > 0) {
+			cancelWaitingTimer(agentId, waitingTimers);
+			cancelPermissionTimer(agentId, permissionTimers);
+			if (agent.permissionSent) {
+				agent.permissionSent = false;
+				sender?.postMessage({ type: 'agentToolPermissionClear', id: agentId });
+			}
+		}
+
+		for (const msg of newMessages) {
+			// 包裝為 JSON 字串再送入 processTranscriptLine（保持統一入口）
+			processTranscriptLine(agentId, JSON.stringify(msg), ctx);
+		}
+	} catch (e) {
+		console.log(`[Pixel Agents] Gemini read error for agent ${agentId}: ${e}`);
+	}
+}
+
 /** 檢查 JSONL 檔案是否最近被修改過（視為「活躍」） */
 function isRecentlyActive(filePath: string): boolean {
 	try {
@@ -142,18 +197,31 @@ export function ensureProjectScan(
 	}, PROJECT_SCAN_INTERVAL_MS);
 }
 
-/** 掃描單一專案目錄，收養活躍的外部 Claude 會話 */
+/** 掃描單一專案目錄，收養活躍的外部會話（支援 JSONL 和 JSON） */
 function scanAndAdopt(
 	projectDir: string,
 	ctx: AgentContext,
 ): void {
 	const { nextAgentIdRef, agents, persistAgents } = ctx;
 
+	const cliType = detectCliTypeFromPath(projectDir);
+	const adapter = getAdapter(cliType);
+
+	const ext = adapter?.sessionFileExtension?.() || '.jsonl';
+
 	let files: string[];
 	try {
-		files = fs.readdirSync(projectDir)
-			.filter(f => f.endsWith('.jsonl'))
-			.map(f => path.join(projectDir, f));
+		if (cliType === 'gemini') {
+			// Gemini 會話在 chats/ 子目錄
+			const chatsDir = path.join(projectDir, 'chats');
+			files = fs.readdirSync(chatsDir)
+				.filter(f => f.endsWith(ext))
+				.map(f => path.join(chatsDir, f));
+		} else {
+			files = fs.readdirSync(projectDir)
+				.filter(f => f.endsWith(ext))
+				.map(f => path.join(projectDir, f));
+		}
 	} catch { return; }
 
 	for (const file of files) {
@@ -197,7 +265,7 @@ function scanAndAdopt(
 			growth: { ...DEFAULT_GROWTH },
 		};
 		// 嘗試從持久化資料還原成長狀態
-		const sessionId = path.basename(file, '.jsonl');
+		const sessionId = path.basename(file, ext);
 		const persisted = loadPersistedAgentsOnce();
 		const match = persisted.find(p => p.sessionId === sessionId);
 		if (match) {
@@ -209,12 +277,12 @@ function scanAndAdopt(
 		const floorSend = ctx.floorSender(floorId);
 		recordSessionStart(id, agent, floorSend);
 		persistAgents();
-		console.log(`[Pixel Agents] Auto-adopted session: ${path.basename(file)} → Agent ${id} (floor: ${floorId})`);
+		console.log(`[Pixel Agents] Auto-adopted session: ${path.basename(file)} → Agent ${id} (floor: ${floorId}, cli: ${cliType})`);
 		const isExternal = projectDir !== ctx.ownProjectDir;
 		floorSend.postMessage({
 			type: 'agentCreated',
 			id,
-			projectName: extractProjectName(projectDir),
+			projectName: extractProjectNameFromFile(file, projectDir),
 			floorId,
 			...(isExternal ? { isExternal: true } : {}),
 			...(cliType !== 'claude' ? { cliType } : {}),

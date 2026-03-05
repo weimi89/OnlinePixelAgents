@@ -32,6 +32,25 @@ export function formatToolStatus(toolName: string, input: Record<string, unknown
 		case 'AskUserQuestion': return 'Waiting for your answer';
 		case 'EnterPlanMode': return 'Planning';
 		case 'NotebookEdit': return `Editing notebook`;
+		// Codex 工具
+		case 'shell':
+		case 'exec_command': {
+			const rawArgs = input.cmd || input.command || '';
+			const shellCmd = Array.isArray(rawArgs) ? (rawArgs as string[]).pop() || '' : String(rawArgs);
+			return `Running: ${shellCmd.length > BASH_COMMAND_DISPLAY_MAX_LENGTH ? shellCmd.slice(0, BASH_COMMAND_DISPLAY_MAX_LENGTH) + '\u2026' : shellCmd}`;
+		}
+		case 'apply_patch': return 'Applying patch';
+		// Gemini 工具（Serena MCP 等）
+		case 'read_file': return `Reading ${base(input.file_path || input.path || input.relative_path)}`;
+		case 'list_dir': return 'Listing directory';
+		case 'replace_content': return 'Editing content';
+		case 'find_symbol': return `Finding symbol`;
+		case 'search_for_pattern': return 'Searching code';
+		case 'execute_shell_command':
+		case 'run_shell_command': {
+			const shCmd = String(input.command || '');
+			return `Running: ${shCmd.length > BASH_COMMAND_DISPLAY_MAX_LENGTH ? shCmd.slice(0, BASH_COMMAND_DISPLAY_MAX_LENGTH) + '\u2026' : shCmd}`;
+		}
 		default: return `Using ${toolName}`;
 	}
 }

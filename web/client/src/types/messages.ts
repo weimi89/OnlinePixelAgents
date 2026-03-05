@@ -34,6 +34,7 @@ interface AgentMeta {
   owner?: string
   fromElevator?: boolean
   cliType?: string
+  startedAt?: number
 }
 
 /** 角色精靈圖方向資料 */
@@ -59,7 +60,7 @@ export interface DashboardPayload {
 /** 伺服器 → 客戶端訊息的 discriminated union */
 export type ServerMessage =
   | { type: 'layoutLoaded'; layout: OfficeLayout | null }
-  | { type: 'agentCreated'; id: number; isExternal?: boolean; projectName?: string; floorId?: string; isRemote?: boolean; owner?: string; fromElevator?: boolean; cliType?: string }
+  | { type: 'agentCreated'; id: number; isExternal?: boolean; projectName?: string; floorId?: string; isRemote?: boolean; owner?: string; fromElevator?: boolean; cliType?: string; startedAt?: number }
   | { type: 'agentClosed'; id: number }
   | { type: 'existingAgents'; agents: number[]; agentMeta?: Record<number, AgentMeta> }
   | { type: 'agentToolStart'; id: number; toolId: string; status: string }

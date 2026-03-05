@@ -57,6 +57,8 @@ export interface AgentState {
 	teamName: string | null;
 	/** 此代理的 CLI 類型（claude/codex/gemini） */
 	cliType: string;
+	/** 代理建立（開始工作）的時間戳（ms） */
+	startedAt: number;
 	/** 代理成長追蹤資料 */
 	growth: GrowthData;
 }

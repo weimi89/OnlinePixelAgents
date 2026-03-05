@@ -144,7 +144,7 @@ function App() {
 
   const display = useDisplaySettings()
 
-  const { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, remoteAgents, agentTranscripts, projectDirs, currentFloorId, building, floorSummaries, chatMessages, agentGitBranches, agentStatusHistory, agentTeams, agentCliTypes, lanPeers, agentGrowthData } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty, editor.handleZoomChange, display.handleUiScaleLoaded)
+  const { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, remoteAgents, agentTranscripts, projectDirs, currentFloorId, building, floorSummaries, chatMessages, agentGitBranches, agentStatusHistory, agentTeams, agentCliTypes, lanPeers, agentGrowthData, agentStartTimes } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty, editor.handleZoomChange, display.handleUiScaleLoaded)
 
   const connected = useConnectionState()
 
@@ -447,6 +447,7 @@ function App() {
             agentTranscripts={agentTranscripts}
             agentTeams={agentTeams}
             agentCliTypes={agentCliTypes}
+            agentStartTimes={agentStartTimes}
             onClose={interaction.handleCloseDetailPanel}
             onCloseAgent={interaction.handleCloseAgent}
           />

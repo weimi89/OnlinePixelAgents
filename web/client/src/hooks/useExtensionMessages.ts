@@ -87,6 +87,8 @@ export interface ExtensionMessageState {
   lanPeers: Array<{ name: string; host: string; port: number; agentCount: number }>
   /** agentId → 成長資料 */
   agentGrowthData: Record<number, { xp: number; level: number; achievements: string[] }>
+  /** agentId → 開始工作時間戳（ms） */
+  agentStartTimes: Record<number, number>
 }
 
 /** 轉錄記錄條目 */
@@ -139,6 +141,7 @@ interface HandlerContext {
   setAgentCliTypes: React.Dispatch<React.SetStateAction<Record<number, string>>>
   setLanPeers: React.Dispatch<React.SetStateAction<Array<{ name: string; host: string; port: number; agentCount: number }>>>
   setAgentGrowthData: React.Dispatch<React.SetStateAction<Record<number, { xp: number; level: number; achievements: string[] }>>>
+  setAgentStartTimes: React.Dispatch<React.SetStateAction<Record<number, number>>>
 }
 
 // ── Message Handlers ───────────────────────────────────────────
@@ -173,6 +176,9 @@ function handleAgentCreated(msg: ServerMessage & { type: 'agentCreated' }, ctx: 
   ctx.setSelectedAgent(id)
   if (projectName) {
     ctx.setAgentProjects((prev) => ({ ...prev, [id]: projectName }))
+  }
+  if (msg.startedAt) {
+    ctx.setAgentStartTimes((prev) => ({ ...prev, [id]: msg.startedAt! }))
   }
   if (msg.cliType) {
     ctx.setAgentCliTypes((prev) => ({ ...prev, [id]: msg.cliType! }))
@@ -211,6 +217,7 @@ function handleAgentClosed(msg: ServerMessage & { type: 'agentClosed' }, ctx: Ha
   ctx.setAgentTeams((prev) => removeKey(prev, id))
   ctx.setAgentCliTypes((prev) => removeKey(prev, id))
   ctx.setAgentGrowthData((prev) => removeKey(prev, id))
+  ctx.setAgentStartTimes((prev) => removeKey(prev, id))
   ctx.os.removeAllSubagents(id)
   ctx.setSubagentCharacters((prev) => prev.filter((s) => s.parentAgentId !== id))
   ctx.os.removeAgent(id)
@@ -218,10 +225,11 @@ function handleAgentClosed(msg: ServerMessage & { type: 'agentClosed' }, ctx: Ha
 
 function handleExistingAgents(msg: ServerMessage & { type: 'existingAgents' }, ctx: HandlerContext): void {
   const incoming = msg.agents
-  const meta = msg.agentMeta || ({} as Record<number, { palette?: number; hueShift?: number; seatId?: string; isExternal?: boolean; projectName?: string; isRemote?: boolean; owner?: string; cliType?: string }>)
+  const meta = msg.agentMeta || ({} as Record<number, { palette?: number; hueShift?: number; seatId?: string; isExternal?: boolean; projectName?: string; isRemote?: boolean; owner?: string; cliType?: string; startedAt?: number }>)
   const newProjects: Record<number, string> = {}
   const newRemote: Record<number, { owner: string }> = {}
   const newCliTypes: Record<number, string> = {}
+  const newStartTimes: Record<number, number> = {}
   for (const id of incoming) {
     const m = meta[id]
     if (m?.projectName) {
@@ -229,6 +237,9 @@ function handleExistingAgents(msg: ServerMessage & { type: 'existingAgents' }, c
     }
     if (m?.cliType) {
       newCliTypes[id] = m.cliType
+    }
+    if (m?.startedAt) {
+      newStartTimes[id] = m.startedAt
     }
     if (m?.isRemote && m?.owner) {
       newRemote[id] = { owner: m.owner }
@@ -248,6 +259,9 @@ function handleExistingAgents(msg: ServerMessage & { type: 'existingAgents' }, c
   }
   if (Object.keys(newCliTypes).length > 0) {
     ctx.setAgentCliTypes((prev) => ({ ...prev, ...newCliTypes }))
+  }
+  if (Object.keys(newStartTimes).length > 0) {
+    ctx.setAgentStartTimes((prev) => ({ ...prev, ...newStartTimes }))
   }
   if (ctx.layoutReadyRef.current && incoming.length > 0) {
     saveAgentSeats(ctx.os)
@@ -524,6 +538,7 @@ function handleAgentFloorTransfer(msg: ServerMessage & { type: 'agentFloorTransf
   ctx.setAgentStatusHistory((prev) => removeKey(prev, id))
   ctx.setAgentTeams((prev) => removeKey(prev, id))
   ctx.setAgentCliTypes((prev) => removeKey(prev, id))
+  ctx.setAgentStartTimes((prev) => removeKey(prev, id))
   ctx.os.removeAllSubagents(id)
   ctx.setSubagentCharacters((prev) => prev.filter((s) => s.parentAgentId !== id))
 }
@@ -611,6 +626,7 @@ function handleFloorSwitched(msg: ServerMessage & { type: 'floorSwitched' }, ctx
   ctx.setAgentStatusHistory({})
   ctx.setAgentTeams({})
   ctx.setAgentCliTypes({})
+  ctx.setAgentStartTimes({})
   ctx.os.clearAllAgents()
   ctx.layoutReadyRef.current = false
   ctx.setLayoutReady(false)
@@ -697,6 +713,7 @@ export function useExtensionMessages(
   const [agentCliTypes, setAgentCliTypes] = useState<Record<number, string>>({})
   const [lanPeers, setLanPeers] = useState<Array<{ name: string; host: string; port: number; agentCount: number }>>([])
   const [agentGrowthData, setAgentGrowthData] = useState<Record<number, { xp: number; level: number; achievements: string[] }>>({})
+  const [agentStartTimes, setAgentStartTimes] = useState<Record<number, number>>({})
 
   const layoutReadyRef = useRef(false)
   const pendingAgentsRef = useRef<Array<{ id: number; palette?: number; hueShift?: number; seatId?: string }>>([])
@@ -734,6 +751,7 @@ export function useExtensionMessages(
       setAgentCliTypes,
       setLanPeers,
       setAgentGrowthData,
+      setAgentStartTimes,
     }
 
     const handler = (data: unknown) => {
@@ -749,5 +767,5 @@ export function useExtensionMessages(
     return unsub
   }, [getOfficeState])
 
-  return { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, remoteAgents, agentTranscripts, excludedProjects, projectDirs, currentFloorId, building, floorSummaries, chatMessages, agentGitBranches, agentStatusHistory, agentTeams, agentCliTypes, lanPeers, agentGrowthData }
+  return { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, remoteAgents, agentTranscripts, excludedProjects, projectDirs, currentFloorId, building, floorSummaries, chatMessages, agentGitBranches, agentStatusHistory, agentTeams, agentCliTypes, lanPeers, agentGrowthData, agentStartTimes }
 }

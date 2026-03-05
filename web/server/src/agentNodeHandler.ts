@@ -108,6 +108,7 @@ function handleAgentNodeEvent(
 				statusHistory: [],
 				teamName: null,
 				cliType: 'claude',
+				startedAt: Date.now(),
 				growth: { xp: 0, toolCallCount: 0, sessionCount: 0, bashCallCount: 0, achievements: [] },
 			};
 
@@ -124,6 +125,7 @@ function handleAgentNodeEvent(
 				id,
 				projectName: event.projectName,
 				floorId,
+				startedAt: agent.startedAt,
 				isRemote: true,
 				owner: username,
 			});

@@ -218,6 +218,7 @@ function createAgentState(
 		statusHistory: [],
 		teamName: null,
 		cliType,
+		startedAt: Date.now(),
 		growth: { ...DEFAULT_GROWTH },
 	};
 }
@@ -313,6 +314,7 @@ function spawnCliAgent(
 		id,
 		projectName: extractProjectName(projectDir),
 		floorId,
+		startedAt: agent.startedAt,
 		...(isExternal ? { isExternal: true } : {}),
 		...(cliType !== 'claude' ? { cliType } : {}),
 	});
@@ -506,6 +508,7 @@ export function recoverTmuxAgents(
 			id,
 			projectName: extractProjectName(projectDir),
 			floorId,
+			startedAt: agent.startedAt,
 			...(isExternal ? { isExternal: true } : {}),
 			...(cliType !== 'claude' ? { cliType } : {}),
 		});
@@ -566,7 +569,7 @@ export function sendExistingAgents(
 	agentIds.sort((a, b) => a - b);
 
 	// 為每個代理補充專案資訊
-	const enrichedMeta: Record<string, { palette?: number; hueShift?: number; seatId?: string; isExternal?: boolean; projectName?: string; floorId?: string; isRemote?: boolean; owner?: string; cliType?: string }> = {};
+	const enrichedMeta: Record<string, { palette?: number; hueShift?: number; seatId?: string; isExternal?: boolean; projectName?: string; floorId?: string; isRemote?: boolean; owner?: string; cliType?: string; startedAt?: number }> = {};
 	for (const [idStr, meta] of Object.entries(agentMeta)) {
 		enrichedMeta[idStr] = { ...meta };
 	}
@@ -577,6 +580,7 @@ export function sendExistingAgents(
 		if (!enrichedMeta[key]) enrichedMeta[key] = {};
 		enrichedMeta[key].projectName = extractProjectName(agent.projectDir);
 		enrichedMeta[key].floorId = agent.floorId;
+		enrichedMeta[key].startedAt = agent.startedAt;
 		const isExternal = agent.projectDir !== ownProjectDir;
 		if (isExternal) {
 			enrichedMeta[key].isExternal = true;

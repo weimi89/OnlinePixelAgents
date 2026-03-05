@@ -31,6 +31,7 @@ interface AgentDetailPanelProps {
   agentTranscripts?: Record<number, TranscriptEntry[]>
   agentTeams?: Record<number, string>
   agentCliTypes?: Record<number, string>
+  agentStartTimes?: Record<number, number>
   onClose: () => void
   onCloseAgent?: (id: number) => void
 }
@@ -153,6 +154,17 @@ function formatElapsed(seconds: number): string {
   return s > 0 ? `${m}m${s}s` : `${m}m`
 }
 
+/** 格式化工作時長（中文，支援小時） */
+function formatWorkDuration(ms: number): string {
+  const totalSec = Math.floor(ms / 1000)
+  if (totalSec < 60) return `${totalSec}秒`
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  if (h > 0) return s > 0 ? `${h}時${m}分${s}秒` : `${h}時${m}分`
+  return s > 0 ? `${m}分${s}秒` : `${m}分`
+}
+
 /** 取得工具名稱的顏色 */
 function getToolColor(status: string): string {
   const toolName = extractToolName(status)
@@ -194,6 +206,7 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
   agentTranscripts,
   agentTeams,
   agentCliTypes,
+  agentStartTimes,
   onClose,
   onCloseAgent,
 }: AgentDetailPanelProps) {
@@ -222,15 +235,24 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  // 即時更新工具耗時
+  const agent = agents[agentId]
+  const status = agentStatuses[agentId]
+  const tools = agentTools[agentId] || []
+  const model = agentModels[agentId]
+  const branch = agentGitBranches[agentId]
+  const team = agentTeams?.[agentId]
+  const cliType = agentCliTypes?.[agentId]
+  const startedAt = agentStartTimes?.[agentId]
+
+  // 即時更新工具耗時和工作時長
   const [, setTick] = useState(0)
   useEffect(() => {
-    const tools = agentTools[agentId]
-    const hasActive = tools?.some((tool) => !tool.done)
-    if (!hasActive) return
+    const activeTools = agentTools[agentId]
+    const hasActive = activeTools?.some((tool) => !tool.done)
+    if (!hasActive && !startedAt) return
     const interval = setInterval(() => setTick((n) => n + 1), 1000)
     return () => clearInterval(interval)
-  }, [agentId, agentTools])
+  }, [agentId, agentTools, startedAt])
 
   const handleClose = useCallback(() => {
     setVisible(false)
@@ -242,14 +264,6 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
   const toolsScrollRef = useRef<HTMLDivElement>(null)
   const historyScrollRef = useRef<HTMLDivElement>(null)
   const transcriptScrollRef = useRef<HTMLDivElement>(null)
-
-  const agent = agents[agentId]
-  const status = agentStatuses[agentId]
-  const tools = agentTools[agentId] || []
-  const model = agentModels[agentId]
-  const branch = agentGitBranches[agentId]
-  const team = agentTeams?.[agentId]
-  const cliType = agentCliTypes?.[agentId]
   const transcript = agentTranscripts?.[agentId] || []
   const history = agentStatusHistory[agentId] || []
   const growth = agentGrowthData[agentId]
@@ -394,6 +408,21 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
               {cliType.toUpperCase()}
             </span>
           </div>
+        )}
+
+        {startedAt && (
+          <>
+            <div style={rowStyle}>
+              <span style={labelStyle}>{t.workStartTime}</span>
+              <span style={valueStyle}>{formatTime(startedAt)}</span>
+            </div>
+            <div style={rowStyle}>
+              <span style={labelStyle}>{t.workDuration}</span>
+              <span style={{ ...valueStyle, color: 'var(--pixel-green)' }}>
+                {formatWorkDuration(Date.now() - startedAt)}
+              </span>
+            </div>
+          </>
         )}
 
       </div>

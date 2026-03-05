@@ -262,6 +262,7 @@ function scanAndAdopt(
 			statusHistory: [],
 			teamName: getTeamName(projectDir),
 			cliType,
+			startedAt: Date.now(),
 			growth: { ...DEFAULT_GROWTH },
 		};
 		// 嘗試從持久化資料還原成長狀態
@@ -284,6 +285,7 @@ function scanAndAdopt(
 			id,
 			projectName: extractProjectNameFromFile(file, projectDir),
 			floorId,
+			startedAt: agent.startedAt,
 			...(isExternal ? { isExternal: true } : {}),
 			...(cliType !== 'claude' ? { cliType } : {}),
 		});

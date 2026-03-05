@@ -207,6 +207,8 @@ export const t = {
   agentDetailClose: '關閉面板',
   agentDetailTimeline: '時間軸',
   agentDetailTranscript: '對話記錄',
+  workStartTime: '開始工作',
+  workDuration: '工作時長',
   noTranscript: '尚無對話記錄',
   noHistory: '尚無歷史記錄',
 

@@ -104,7 +104,7 @@ export const ChatPanel = memo(function ChatPanel({ messages }: ChatPanelProps) {
             alignItems: 'center',
             gap: 6,
             boxShadow: 'var(--pixel-shadow)',
-            ...(isMobile ? { position: 'fixed', bottom: 56, right: 8, left: 'auto', width: 'auto', zIndex: 44 } : {}),
+            ...(isMobile ? { position: 'fixed', bottom: 90, right: 8, left: 'auto', width: 'auto', zIndex: 44 } : {}),
           }}
         >
           <span style={{ fontSize: isMobile ? '16px' : '20px', color: 'var(--pixel-text)' }}>{t.chat}</span>

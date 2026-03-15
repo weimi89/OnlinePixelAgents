@@ -10,6 +10,7 @@ export interface UserRow {
 	password_hash: string;
 	role: string;
 	must_change_password: number; // SQLite boolean: 0 | 1
+	api_key: string | null;
 	created_at: string;
 	last_login_at: string | null;
 }
@@ -19,6 +20,7 @@ export interface PublicUserRow {
 	username: string;
 	role: string;
 	must_change_password: number;
+	api_key: string | null;
 	created_at: string;
 }
 
@@ -130,16 +132,18 @@ export class Database {
 		passwordHash: string;
 		role?: string;
 		mustChangePassword?: boolean;
+		apiKey?: string;
 	}): void {
 		this.db.prepare(
-			`INSERT INTO users (id, username, password_hash, role, must_change_password)
-			 VALUES (?, ?, ?, ?, ?)`,
+			`INSERT INTO users (id, username, password_hash, role, must_change_password, api_key)
+			 VALUES (?, ?, ?, ?, ?, ?)`,
 		).run(
 			user.id,
 			user.username,
 			user.passwordHash,
 			user.role ?? 'admin',
 			user.mustChangePassword ? 1 : 0,
+			user.apiKey ?? null,
 		);
 	}
 
@@ -153,8 +157,22 @@ export class Database {
 
 	listUsers(): PublicUserRow[] {
 		return this.db.prepare(
-			`SELECT id, username, role, must_change_password, created_at FROM users`,
+			`SELECT id, username, role, must_change_password, api_key, created_at FROM users`,
 		).all() as PublicUserRow[];
+	}
+
+	/** 透過 API Key 查找使用者 */
+	getUserByApiKey(apiKey: string): UserRow | undefined {
+		return this.db.prepare(
+			`SELECT * FROM users WHERE api_key = ?`,
+		).get(apiKey) as UserRow | undefined;
+	}
+
+	/** 更新使用者的 API Key */
+	updateApiKey(userId: string, apiKey: string): void {
+		this.db.prepare(
+			`UPDATE users SET api_key = ? WHERE id = ?`,
+		).run(apiKey, userId);
 	}
 
 	updateUserPassword(username: string, hash: string): void {

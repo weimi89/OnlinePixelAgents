@@ -1,6 +1,6 @@
 // ── SQLite Schema Definition ────────────────────────────────────────
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const INITIAL_SCHEMA = `
 -- ── Schema versioning ────────────────────────────────────

@@ -108,8 +108,8 @@ export function NodeHealthPanel({ isOpen, onClose, nodes }: NodeHealthPanelProps
           borderRadius: 0,
           padding: '4px',
           boxShadow: 'var(--pixel-shadow)',
-          minWidth: 280,
-          maxWidth: 420,
+          minWidth: 'min(280px, calc(100vw - 24px))',
+          maxWidth: 'min(420px, calc(100vw - 24px))',
           maxHeight: '80vh',
           overflowY: 'auto',
         }}

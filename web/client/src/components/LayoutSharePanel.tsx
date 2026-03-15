@@ -157,7 +157,7 @@ export const LayoutSharePanel = memo(function LayoutSharePanel({ isOpen, onClose
           borderRadius: 0,
           padding: '4px',
           boxShadow: 'var(--pixel-shadow)',
-          minWidth: 220,
+          minWidth: 'min(220px, calc(100vw - 24px))',
         }}
       >
         {/* 標題 */}

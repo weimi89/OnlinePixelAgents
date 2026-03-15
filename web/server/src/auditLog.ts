@@ -16,13 +16,15 @@ import { db } from './db/database.js';
 export type AuditAction =
 	| 'login'
 	| 'login_failed'
+	| 'login_apikey'
 	| 'register'
 	| 'password_change'
 	| 'role_change'
 	| 'user_delete'
 	| 'agent_close'
 	| 'layout_save'
-	| 'token_refresh';
+	| 'token_refresh'
+	| 'apikey_regenerate';
 
 interface AuditEntry {
 	timestamp: string;

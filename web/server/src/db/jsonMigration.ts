@@ -38,7 +38,7 @@ interface StoredUserJson {
 	passwordHash: string;
 	createdAt: string;
 	mustChangePassword?: boolean;
-	role?: 'admin' | 'viewer';
+	role?: 'admin' | 'viewer' | 'member';
 }
 
 interface UsersDataJson {
@@ -134,16 +134,24 @@ export function migrateFromJson(database: Database, dataDir: string): boolean {
 		const usersData = readJson<UsersDataJson>(path.join(dataDir, 'users.json'));
 		if (usersData?.users?.length) {
 			const stmt = rawDb.prepare(
-				`INSERT OR IGNORE INTO users (id, username, password_hash, role, must_change_password, created_at)
-				 VALUES (?, ?, ?, ?, ?, ?)`,
+				`INSERT OR IGNORE INTO users (id, username, password_hash, role, must_change_password, api_key, created_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 			);
 			for (const u of usersData.users) {
+				// viewer 角色遷移為 member，並為每個使用者生成 apiKey
+				const role = u.role === 'viewer' ? 'member' : (u.role ?? 'admin');
+				const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+				let apiKey = 'pa_';
+				for (let i = 0; i < 32; i++) {
+					apiKey += chars.charAt(Math.floor(Math.random() * chars.length));
+				}
 				stmt.run(
 					u.id,
 					u.username,
 					u.passwordHash,
-					u.role ?? 'admin',
+					role,
 					u.mustChangePassword ? 1 : 0,
+					apiKey,
 					u.createdAt,
 				);
 			}

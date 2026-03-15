@@ -46,6 +46,8 @@ import { startAutoBackup, stopAutoBackup, runBackupNow } from './backup.js';
 import { sendTmuxKeys } from './tmuxManager.js';
 import { cancelPermissionTimer } from './timerManager.js';
 import { initAuthRoutes } from './auth/routes.js';
+import { socketAuthMiddleware, handleAuthUpgrade } from './auth/socketAuth.js';
+import { SENSITIVE_MESSAGE_TYPES, shouldSendMessage } from './auth/messageFilter.js';
 import { setupAgentNodeNamespace, getConnectedNodes, syncExcludedProjectsToNodes, startRemoteTerminalRelay, sendRemoteTerminalInput, sendRemoteTerminalResize, detachRemoteTerminal, forwardResumeSessionToNode } from './agentNodeHandler.js';
 import { cluster } from './cluster.js';
 import { loadDashboardStats, getDashboardStats, flushDashboardStats, startStatsFlushTimer, stopStatsFlushTimer } from './dashboardStats.js';
@@ -348,6 +350,7 @@ async function main(): Promise<void> {
 		`https://localhost:${port}`,
 		`https://127.0.0.1:${port}`,
 		'http://localhost:5173', // Vite 開發伺服器
+		'https://online-pixel-agents.build-site.dev',
 	];
 	// 從環境變數擴充允許的來源（逗號分隔）
 	const envOrigins = process.env[ALLOWED_ORIGINS_ENV_KEY];
@@ -467,16 +470,46 @@ async function main(): Promise<void> {
 	}, NODE_HEALTH_BROADCAST_INTERVAL_MS);
 
 	// 全域廣播 sender — 用於需要送達所有客戶端的訊息（如 projectNameUpdated）
+	// 敏感訊息會依角色過濾，僅發送給 admin/member
 	ctx.sender = {
 		postMessage(msg: unknown) {
-			io.emit('message', msg);
+			const msgObj = msg as Record<string, unknown>;
+			const msgType = msgObj.type as string;
+			// 非敏感訊息 → 直接全域廣播（效能最佳）
+			if (!SENSITIVE_MESSAGE_TYPES.has(msgType)) {
+				io.emit('message', msg);
+				return;
+			}
+			// 敏感訊息 → 逐 socket 檢查角色
+			for (const [, s] of io.sockets.sockets) {
+				if (shouldSendMessage(s.data.role || 'anonymous', msgType)) {
+					s.emit('message', msg);
+				}
+			}
 		},
 	};
 
 	// 樓層 sender — 僅廣播至特定樓層的客戶端
+	// 敏感訊息會依角色過濾，僅發送給 admin/member
 	ctx.floorSender = (floorId: FloorId) => ({
 		postMessage(msg: unknown) {
-			io.to(`floor:${floorId}`).emit('message', msg);
+			const msgObj = msg as Record<string, unknown>;
+			const msgType = msgObj.type as string;
+			const room = `floor:${floorId}`;
+			// 非敏感訊息 → 直接 Room 廣播（效能最佳）
+			if (!SENSITIVE_MESSAGE_TYPES.has(msgType)) {
+				io.to(room).emit('message', msg);
+				return;
+			}
+			// 敏感訊息 → 只發給 admin/member（逐 socket 檢查）
+			const sockets = io.sockets.adapter.rooms.get(room);
+			if (!sockets) return;
+			for (const socketId of sockets) {
+				const s = io.sockets.sockets.get(socketId);
+				if (s && shouldSendMessage(s.data.role || 'anonymous', msgType)) {
+					s.emit('message', msg);
+				}
+			}
 		},
 	});
 
@@ -494,9 +527,19 @@ async function main(): Promise<void> {
 		ctx.sender?.postMessage({ type: 'floorSummaries', summaries });
 	};
 
+	// Socket.IO 認證中間件（主 namespace，不影響 /agent-node）
+	io.use(socketAuthMiddleware);
+
 	// Socket.IO 連線處理器
 	io.on('connection', (socket) => {
-		console.log(`[Pixel Agents] Client connected: ${socket.id}`);
+		console.log(`[Pixel Agents] Client connected: ${socket.id} (role=${socket.data.role || 'anonymous'})`);
+
+		// 推送認證狀態（讓客戶端知道目前身份）
+		socket.emit('message', {
+			type: 'auth:status',
+			role: socket.data.role || 'anonymous',
+			username: socket.data.username || null,
+		});
 
 		// 預設加入預設樓層的 room
 		const defaultFloor = ctx.building.defaultFloorId;
@@ -513,6 +556,22 @@ async function main(): Promise<void> {
 
 		socket.on('message', (msg: unknown) => {
 			handleClientMessage(msg as ClientMessage, directSender, socket);
+		});
+
+		// auth:upgrade — 匿名用戶登入後升級身份（不走 ClientMessage）
+		socket.on('auth:upgrade', (data: { token: string }) => {
+			const result = handleAuthUpgrade(socket, data.token);
+			if (result.success) {
+				socket.emit('message', { type: 'auth:upgraded', username: result.username, role: result.role });
+				// 升級後重新推送代理詳情（重走 webviewReady 的代理部分）
+				const currentFloor = socketFloors.get(socket.id) || defaultFloor;
+				const agentMeta = readJsonFile<Record<string, { palette?: number; hueShift?: number; seatId?: string }>>(
+					getAgentSeatsPath(), {},
+				);
+				sendExistingAgents(agents, agentMeta, directSender, ownProjectDir, currentFloor);
+			} else {
+				socket.emit('message', { type: 'auth:error', error: result.error });
+			}
 		});
 
 		socket.on('disconnect', () => {

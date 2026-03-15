@@ -4,7 +4,7 @@ import { t } from '../i18n.js'
 interface UserInfo {
   id: string
   username: string
-  role: 'admin' | 'viewer'
+  role: 'admin' | 'member'
   createdAt: string
   mustChangePassword: boolean
 }
@@ -27,8 +27,8 @@ const panelStyle: React.CSSProperties = {
   borderRadius: 0,
   padding: '4px',
   boxShadow: 'var(--pixel-shadow)',
-  minWidth: 360,
-  maxWidth: 500,
+  minWidth: 'min(360px, calc(100vw - 24px))',
+  maxWidth: 'min(500px, calc(100vw - 24px))',
   maxHeight: '80vh',
   overflow: 'auto',
 }
@@ -109,7 +109,7 @@ export function UserManagementPanel({ isOpen, onClose, token }: UserManagementPa
 
   if (!isOpen) return null
 
-  const handleRoleChange = async (userId: string, newRole: 'admin' | 'viewer') => {
+  const handleRoleChange = async (userId: string, newRole: 'admin' | 'member') => {
     if (!token) return
     try {
       const res = await fetch(`/api/auth/users/${userId}/role`, {
@@ -162,7 +162,7 @@ export function UserManagementPanel({ isOpen, onClose, token }: UserManagementPa
         }}
       />
       {/* 面板 */}
-      <div role="dialog" aria-modal="true" aria-label={t.userManagementPanel} style={panelStyle}>
+      <div role="dialog" aria-modal="true" aria-label={t.userManagementPanel} className="pixel-modal-dialog" style={panelStyle}>
         <div style={headerStyle}>
           <span style={{ fontSize: '24px', color: 'rgba(255, 255, 255, 0.9)' }}>
             {t.userManagementPanel}
@@ -236,7 +236,7 @@ export function UserManagementPanel({ isOpen, onClose, token }: UserManagementPa
             <span style={{ flex: 1, textAlign: 'center' }}>
               <select
                 value={user.role}
-                onChange={(e) => handleRoleChange(user.id, e.target.value as 'admin' | 'viewer')}
+                onChange={(e) => handleRoleChange(user.id, e.target.value as 'admin' | 'member')}
                 style={{
                   background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.3)',
@@ -248,7 +248,7 @@ export function UserManagementPanel({ isOpen, onClose, token }: UserManagementPa
                 }}
               >
                 <option value="admin">{t.roleAdmin}</option>
-                <option value="viewer">{t.roleViewer}</option>
+                <option value="member">{t.roleMember}</option>
               </select>
             </span>
             <span style={{ flex: 1, textAlign: 'right' }}>

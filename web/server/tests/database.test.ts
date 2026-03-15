@@ -54,7 +54,7 @@ describe('Database (in-memory SQLite)', () => {
 				id: 'u2',
 				username: 'bob',
 				passwordHash: '$2a$10$hash',
-				role: 'viewer',
+				role: 'member',
 				mustChangePassword: true,
 			});
 			const user = database.getUserById('u2');
@@ -70,7 +70,7 @@ describe('Database (in-memory SQLite)', () => {
 
 		it('lists users without password hash', () => {
 			database.createUser({ id: 'u1', username: 'a', passwordHash: 'secret', role: 'admin', mustChangePassword: false });
-			database.createUser({ id: 'u2', username: 'b', passwordHash: 'secret', role: 'viewer', mustChangePassword: false });
+			database.createUser({ id: 'u2', username: 'b', passwordHash: 'secret', role: 'member', mustChangePassword: false });
 			const list = database.listUsers();
 			expect(list).toHaveLength(2);
 			// PublicUserRow should not have password_hash
@@ -93,8 +93,8 @@ describe('Database (in-memory SQLite)', () => {
 
 		it('updates user role', () => {
 			database.createUser({ id: 'u1', username: 'alice', passwordHash: 'h', role: 'admin', mustChangePassword: false });
-			database.updateUserRole('u1', 'viewer');
-			expect(database.getUserByUsername('alice')!.role).toBe('viewer');
+			database.updateUserRole('u1', 'member');
+			expect(database.getUserByUsername('alice')!.role).toBe('member');
 		});
 
 		it('deletes user', () => {
@@ -106,7 +106,7 @@ describe('Database (in-memory SQLite)', () => {
 		it('rejects duplicate username', () => {
 			database.createUser({ id: 'u1', username: 'alice', passwordHash: 'h', role: 'admin', mustChangePassword: false });
 			expect(() => {
-				database.createUser({ id: 'u2', username: 'alice', passwordHash: 'h2', role: 'viewer', mustChangePassword: false });
+				database.createUser({ id: 'u2', username: 'alice', passwordHash: 'h2', role: 'member', mustChangePassword: false });
 			}).toThrow();
 		});
 	});

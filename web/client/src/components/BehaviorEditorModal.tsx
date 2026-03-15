@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, memo } from 'react'
 import { vscode } from '../socketApi.js'
 import { getBehaviorConfig, DEFAULT_BEHAVIOR_CONFIG } from '../office/engine/behaviorConfig.js'
 import type { BehaviorConfig } from '../office/engine/behaviorConfig.js'
+import { useDeviceType } from '../hooks/useDeviceType.js'
 import { t } from '../i18n.js'
 
 interface BehaviorEditorModalProps {
@@ -25,7 +26,7 @@ const modalStyle: React.CSSProperties = {
   borderRadius: 0,
   padding: '16px 20px',
   boxShadow: 'var(--pixel-shadow)',
-  maxWidth: 520,
+  maxWidth: 'min(520px, calc(100vw - 24px))',
   width: '90%',
   maxHeight: '80vh',
   overflowY: 'auto',
@@ -52,17 +53,21 @@ const sliderRowStyle: React.CSSProperties = {
 }
 
 const labelStyle: React.CSSProperties = {
-  flex: '0 0 120px',
+  flex: '0 0 auto',
+  minWidth: 60,
+  maxWidth: 120,
   textAlign: 'right',
 }
 
 const sliderStyle: React.CSSProperties = {
   flex: 1,
+  minWidth: 0,
   accentColor: 'var(--pixel-accent)',
 }
 
 const valueStyle: React.CSSProperties = {
-  flex: '0 0 48px',
+  flex: '0 0 auto',
+  minWidth: 36,
   textAlign: 'right',
   fontVariantNumeric: 'tabular-nums',
 }
@@ -138,6 +143,7 @@ export const BehaviorEditorModal = memo(function BehaviorEditorModal({
   isOpen,
   onClose,
 }: BehaviorEditorModalProps) {
+  const { isMobile } = useDeviceType()
   const [config, setConfig] = useState<BehaviorConfig>(() => ({ ...getBehaviorConfig() }))
 
   // 開啟時同步最新配置
@@ -174,9 +180,27 @@ export const BehaviorEditorModal = memo(function BehaviorEditorModal({
     config.wanderWeightReturnSeat
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
+    <div style={{ ...overlayStyle, alignItems: isMobile ? 'flex-end' : 'center' }} onClick={onClose}>
       <div className="pixel-modal-dialog" style={modalStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontSize: '24px', marginBottom: 12 }}>{t.behaviorEditor}</div>
+        {/* 標題列 + 關閉按鈕 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <span style={{ fontSize: '24px' }}>{t.behaviorEditor}</span>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderRadius: 0,
+              color: 'var(--pixel-close-text)',
+              fontSize: '22px',
+              cursor: 'pointer',
+              padding: '4px 8px',
+              lineHeight: 1,
+            }}
+          >
+            X
+          </button>
+        </div>
 
         {/* 漫遊行為權重 */}
         <div style={sectionStyle}>

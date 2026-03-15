@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { LAYOUT_FILE_DIR, USERS_FILE_NAME } from '../constants.js';
 import { atomicWriteJson } from '../atomicWrite.js';
@@ -14,16 +15,18 @@ export interface StoredUser {
 	passwordHash: string;
 	createdAt: string;
 	mustChangePassword?: boolean;
-	role?: 'admin' | 'viewer';
+	role?: 'admin' | 'member';
+	apiKey: string;
 }
 
 /** 對外公開的使用者資訊（不含密碼雜湊） */
 export interface PublicUser {
 	id: string;
 	username: string;
-	role: 'admin' | 'viewer';
+	role: 'admin' | 'member';
 	createdAt: string;
 	mustChangePassword: boolean;
+	apiKey: string;
 }
 
 interface UsersData {
@@ -34,12 +37,27 @@ function getUsersFilePath(): string {
 	return path.join(userDir, USERS_FILE_NAME);
 }
 
+/** 產生 API Key：pa_ + 32 字元隨機英數字串 */
+export function generateApiKey(): string {
+	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+	const randomBytes = crypto.randomBytes(32);
+	let result = 'pa_';
+	for (let i = 0; i < 32; i++) {
+		result += chars.charAt(randomBytes[i] % chars.length);
+	}
+	return result;
+}
+
 /** 讀取時自動補全缺失欄位（向下相容舊格式） */
 function migrateUser(user: StoredUser): StoredUser {
+	// viewer 角色自動遷移為 member
+	const role = user.role === ('viewer' as string) ? 'member' : (user.role ?? 'admin');
 	return {
 		...user,
-		role: user.role ?? 'admin',
+		role,
 		mustChangePassword: user.mustChangePassword ?? false,
+		// 若無 apiKey 則自動生成
+		apiKey: user.apiKey || generateApiKey(),
 	};
 }
 
@@ -64,22 +82,27 @@ function generateId(): string {
 }
 
 /** 將 DB UserRow 轉換為 StoredUser */
-function dbRowToStoredUser(row: { id: string; username: string; password_hash: string; role: string; must_change_password: number; created_at: string }): StoredUser {
+function dbRowToStoredUser(row: { id: string; username: string; password_hash: string; role: string; must_change_password: number; created_at: string; api_key?: string | null }): StoredUser {
+	// viewer 角色自動遷移為 member
+	const role = row.role === 'viewer' ? 'member' : row.role;
 	return {
 		id: row.id,
 		username: row.username,
 		passwordHash: row.password_hash,
 		createdAt: row.created_at,
-		role: row.role as 'admin' | 'viewer',
+		role: role as 'admin' | 'member',
 		mustChangePassword: row.must_change_password === 1,
+		apiKey: row.api_key || generateApiKey(),
 	};
 }
 
 export async function createUser(
 	username: string,
 	password: string,
-	options?: { mustChangePassword?: boolean; role?: 'admin' | 'viewer' },
+	options?: { mustChangePassword?: boolean; role?: 'admin' | 'member' },
 ): Promise<StoredUser> {
+	const apiKey = generateApiKey();
+
 	if (db) {
 		const existing = db.getUserByUsername(username);
 		if (existing) {
@@ -89,12 +112,12 @@ export async function createUser(
 		const id = generateId();
 		const role = options?.role ?? 'admin';
 		const mustChangePassword = options?.mustChangePassword ?? false;
-		db.createUser({ id, username, passwordHash, role, mustChangePassword });
+		db.createUser({ id, username, passwordHash, role, mustChangePassword, apiKey });
 		const row = db.getUserByUsername(username);
 		return row ? dbRowToStoredUser(row) : {
 			id, username, passwordHash,
 			createdAt: new Date().toISOString(),
-			mustChangePassword, role,
+			mustChangePassword, role, apiKey,
 		};
 	}
 
@@ -111,6 +134,7 @@ export async function createUser(
 		createdAt: new Date().toISOString(),
 		mustChangePassword: options?.mustChangePassword ?? false,
 		role: options?.role ?? 'admin',
+		apiKey,
 	};
 	data.users.push(user);
 	writeUsersData(data);
@@ -132,6 +156,17 @@ export async function verifyUser(username: string, password: string): Promise<St
 	if (!user) return null;
 	const valid = await bcrypt.compare(password, user.passwordHash);
 	return valid ? user : null;
+}
+
+/** 透過 API Key 驗證使用者 */
+export function verifyApiKey(apiKey: string): StoredUser | null {
+	if (db) {
+		const row = db.getUserByApiKey(apiKey);
+		if (!row) return null;
+		return dbRowToStoredUser(row);
+	}
+	const data = readUsersDataFromJson();
+	return data.users.find(u => u.apiKey === apiKey) || null;
 }
 
 export function getUserByUsername(username: string): StoredUser | null {
@@ -188,7 +223,7 @@ export function clearMustChangePassword(username: string): void {
 }
 
 /** 更新使用者角色 */
-export function updateUserRole(id: string, role: 'admin' | 'viewer'): void {
+export function updateUserRole(id: string, role: 'admin' | 'member'): void {
 	if (db) {
 		const row = db.getUserById(id);
 		if (!row) throw new Error('User not found');
@@ -200,6 +235,23 @@ export function updateUserRole(id: string, role: 'admin' | 'viewer'): void {
 	if (!user) throw new Error('User not found');
 	user.role = role;
 	writeUsersData(data);
+}
+
+/** 重新生成使用者的 API Key，回傳新 key */
+export function regenerateApiKey(userId: string): string {
+	const newKey = generateApiKey();
+	if (db) {
+		const row = db.getUserById(userId);
+		if (!row) throw new Error('User not found');
+		db.updateApiKey(userId, newKey);
+		return newKey;
+	}
+	const data = readUsersDataFromJson();
+	const user = data.users.find(u => u.id === userId);
+	if (!user) throw new Error('User not found');
+	user.apiKey = newKey;
+	writeUsersData(data);
+	return newKey;
 }
 
 /** 刪除使用者 */
@@ -220,13 +272,18 @@ export function deleteUser(id: string): void {
 /** 列出所有使用者（不含密碼雜湊） */
 export function listUsers(): PublicUser[] {
 	if (db) {
-		return db.listUsers().map(u => ({
-			id: u.id,
-			username: u.username,
-			role: u.role as 'admin' | 'viewer',
-			createdAt: u.created_at,
-			mustChangePassword: u.must_change_password === 1,
-		}));
+		return db.listUsers().map(u => {
+			// viewer 角色自動遷移為 member
+			const role = u.role === 'viewer' ? 'member' : u.role;
+			return {
+				id: u.id,
+				username: u.username,
+				role: role as 'admin' | 'member',
+				createdAt: u.created_at,
+				mustChangePassword: u.must_change_password === 1,
+				apiKey: u.api_key || generateApiKey(),
+			};
+		});
 	}
 	const data = readUsersDataFromJson();
 	return data.users.map(u => ({
@@ -235,6 +292,7 @@ export function listUsers(): PublicUser[] {
 		role: u.role ?? 'admin',
 		createdAt: u.createdAt,
 		mustChangePassword: u.mustChangePassword ?? false,
+		apiKey: u.apiKey,
 	}));
 }
 

@@ -36,6 +36,8 @@ import { Dashboard } from './pages/Dashboard.js'
 import { AchievementToast } from './components/AchievementToast.js'
 import { TeamPanel } from './components/TeamPanel.js'
 import { LayoutSharePanel } from './components/LayoutSharePanel.js'
+import { AuthPanel } from './components/AuthPanel.js'
+import { AuthProvider } from './hooks/useAuth.js'
 import { useTheme } from './hooks/useTheme.js'
 import { t } from './i18n.js'
 
@@ -314,6 +316,9 @@ function App() {
 
       {!panels.isDashboardView && <ZoomControls zoom={editor.zoom} onZoomChange={editor.handleZoomChange} />}
 
+      {/* 認證面板（右上角） */}
+      <AuthPanel />
+
       {/* 斷線指示器 */}
       {!connected && (
         <div
@@ -321,7 +326,7 @@ function App() {
           style={{
             position: 'absolute',
             top: 8,
-            right: 80,
+            right: 160,
             zIndex: 'var(--pixel-controls-z)',
             background: 'var(--pixel-bg)',
             border: '2px solid var(--pixel-status-permission)',
@@ -672,4 +677,12 @@ function App() {
   )
 }
 
-export default App
+function AppWithAuth() {
+  return (
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  )
+}
+
+export default AppWithAuth

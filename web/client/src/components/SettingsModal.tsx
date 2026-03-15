@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { vscode, onServerMessage } from '../socketApi.js'
 import { isSoundEnabled, setSoundEnabled, getSoundConfig, setSoundConfig } from '../notificationSound.js'
 import type { SoundConfig } from '../notificationSound.js'
@@ -133,7 +134,7 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode,
     onClose()
   }
 
-  return (
+  return createPortal(
     <>
       {/* 隱藏的檔案輸入，用於匯入 */}
       <input
@@ -153,7 +154,7 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode,
           width: '100%',
           height: '100%',
           background: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 49,
+          zIndex: 199,
         }}
       />
       {/* 置中彈出視窗 */}
@@ -167,7 +168,7 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode,
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          zIndex: 50,
+          zIndex: 200,
           background: 'var(--pixel-bg)',
           border: '2px solid var(--pixel-border)',
           borderRadius: 0,
@@ -647,6 +648,7 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode,
         onClose={() => setIsUserMgmtOpen(false)}
         token={authToken ?? null}
       />
-    </>
+    </>,
+    document.body,
   )
 }

@@ -1,6 +1,9 @@
 import type { ChildProcess } from 'child_process';
 import type { FSWatcher } from 'fs';
 
+/** 使用者角色型別（anonymous 僅為型別標記，不可儲存於資料庫） */
+export type UserRole = 'admin' | 'member' | 'anonymous';
+
 export type FloorId = string;
 
 export interface FloorConfig {

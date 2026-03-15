@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { vscode } from '../socketApi.js'
+import { useDeviceType } from '../hooks/useDeviceType.js'
 import { t } from '../i18n.js'
 import { CHAT_INPUT_MAX_LENGTH, CHAT_PANEL_MAX_MESSAGES } from '../constants.js'
 
@@ -24,6 +25,7 @@ function nicknameColor(name: string): string {
 }
 
 export const ChatPanel = memo(function ChatPanel({ messages }: ChatPanelProps) {
+  const { isMobile } = useDeviceType()
   const [expanded, setExpanded] = useState(false)
   const [inputText, setInputText] = useState('')
   const [hasNew, setHasNew] = useState(false)
@@ -78,13 +80,14 @@ export const ChatPanel = memo(function ChatPanel({ messages }: ChatPanelProps) {
     <div
       className="pixel-chat-panel"
       style={{
-        position: 'absolute',
-        bottom: 50,
-        right: 10,
-        zIndex: 45,
+        position: isMobile ? 'fixed' : 'absolute',
+        bottom: isMobile ? 0 : 50,
+        right: isMobile ? 0 : 10,
+        left: isMobile ? 0 : 'auto',
+        zIndex: isMobile ? 44 : 45,
         display: 'flex',
         flexDirection: 'column',
-        width: 280,
+        width: isMobile ? '100%' : 280,
       }}
     >
       {/* 收合時僅顯示最新訊息與切換按鈕 */}
@@ -95,16 +98,17 @@ export const ChatPanel = memo(function ChatPanel({ messages }: ChatPanelProps) {
             background: 'var(--pixel-bg)',
             border: '2px solid var(--pixel-border)',
             borderRadius: 0,
-            padding: '4px 8px',
+            padding: isMobile ? '8px 12px' : '4px 8px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: 6,
             boxShadow: 'var(--pixel-shadow)',
+            ...(isMobile ? { position: 'fixed', bottom: 56, right: 8, left: 'auto', width: 'auto', zIndex: 44 } : {}),
           }}
         >
-          <span style={{ fontSize: '20px', color: 'var(--pixel-text)' }}>{t.chat}</span>
-          {lastMsg && (
+          <span style={{ fontSize: isMobile ? '16px' : '20px', color: 'var(--pixel-text)' }}>{t.chat}</span>
+          {!isMobile && lastMsg && (
             <span
               style={{
                 fontSize: '18px',
@@ -139,12 +143,14 @@ export const ChatPanel = memo(function ChatPanel({ messages }: ChatPanelProps) {
         <div
           style={{
             background: 'var(--pixel-bg)',
-            border: '2px solid var(--pixel-border)',
+            border: isMobile ? 'none' : '2px solid var(--pixel-border)',
+            borderTop: '2px solid var(--pixel-border)',
             borderRadius: 0,
-            boxShadow: 'var(--pixel-shadow)',
+            boxShadow: isMobile ? '0 -4px 0 #0a0a14' : 'var(--pixel-shadow)',
             display: 'flex',
             flexDirection: 'column',
-            maxHeight: 300,
+            maxHeight: isMobile ? '50vh' : 300,
+            paddingBottom: isMobile ? 'env(safe-area-inset-bottom)' : 0,
           }}
         >
           {/* 標題列 */}
@@ -230,10 +236,11 @@ export const ChatPanel = memo(function ChatPanel({ messages }: ChatPanelProps) {
                 border: `1px solid ${inputFocused ? 'var(--pixel-accent)' : 'var(--pixel-border)'}`,
                 borderRadius: 0,
                 color: 'var(--pixel-text)',
-                fontSize: '18px',
-                padding: '3px 6px',
+                fontSize: isMobile ? '16px' : '18px',
+                padding: isMobile ? '8px 10px' : '3px 6px',
                 outline: 'none',
                 fontFamily: 'inherit',
+                minHeight: isMobile ? 40 : 'auto',
               }}
             />
             <button
@@ -245,10 +252,11 @@ export const ChatPanel = memo(function ChatPanel({ messages }: ChatPanelProps) {
                 border: '2px solid transparent',
                 borderRadius: 0,
                 color: 'var(--pixel-text)',
-                fontSize: '18px',
-                padding: '3px 8px',
+                fontSize: isMobile ? '16px' : '18px',
+                padding: isMobile ? '8px 14px' : '3px 8px',
                 cursor: 'pointer',
                 fontFamily: 'inherit',
+                minHeight: isMobile ? 40 : 'auto',
               }}
             >
               {t.chatSend}

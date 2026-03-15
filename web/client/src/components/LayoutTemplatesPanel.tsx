@@ -116,7 +116,7 @@ export function LayoutTemplatesPanel({ isOpen, onClose, floors, currentFloorId }
           borderRadius: 0,
           padding: '4px',
           boxShadow: 'var(--pixel-shadow)',
-          minWidth: 280,
+          minWidth: 'min(280px, calc(100vw - 24px))',
           maxHeight: '80vh',
           display: 'flex',
           flexDirection: 'column',

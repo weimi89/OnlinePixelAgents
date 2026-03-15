@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import {
 	createUser,
 	verifyUser,
+	verifyApiKey,
 	ensureDefaultUser,
 	updateUserPassword,
 	clearMustChangePassword,
@@ -11,6 +12,7 @@ import {
 	getUserById,
 	updateUserRole,
 	deleteUser,
+	regenerateApiKey,
 } from './userStore.js';
 import { signToken, signAccessToken, signRefreshToken, verifyToken, verifyRefreshToken } from './jwt.js';
 import type { TokenPayload } from './jwt.js';
@@ -79,7 +81,12 @@ router.post('/register', async (req, res) => {
 		const accessToken = signAccessToken(user.id, user.username, user.mustChangePassword, user.role);
 		const refreshToken = signRefreshToken(user.id, user.username, user.role);
 		logAudit('register', user.id, `username=${username}`, req.ip);
-		res.json({ token, accessToken, refreshToken, username: user.username, role: user.role ?? 'admin' });
+		res.json({
+			token, accessToken, refreshToken,
+			username: user.username,
+			role: user.role ?? 'admin',
+			apiKey: user.apiKey,
+		});
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Registration failed';
 		res.status(409).json({ error: message });
@@ -88,7 +95,31 @@ router.post('/register', async (req, res) => {
 
 router.post('/login', async (req, res) => {
 	try {
-		const { username, password } = req.body as { username?: string; password?: string };
+		const { username, password, apiKey } = req.body as { username?: string; password?: string; apiKey?: string };
+
+		// 若 body 包含 apiKey，自動走 API Key 驗證路徑
+		if (apiKey) {
+			const user = verifyApiKey(apiKey);
+			if (!user) {
+				logAudit('login_failed', undefined, 'method=apikey', req.ip);
+				res.status(401).json({ error: 'Invalid API key' });
+				return;
+			}
+			const accessToken = signAccessToken(user.id, user.username, user.mustChangePassword, user.role);
+			const refreshToken = signRefreshToken(user.id, user.username, user.role);
+			const legacyToken = signToken(user.id, user.username, user.mustChangePassword, user.role);
+			logAudit('login_apikey', user.id, `username=${user.username}`, req.ip);
+			res.json({
+				token: legacyToken,
+				accessToken,
+				refreshToken,
+				username: user.username,
+				role: user.role ?? 'admin',
+				mustChangePassword: user.mustChangePassword ?? false,
+			});
+			return;
+		}
+
 		if (!username || !password) {
 			res.status(400).json({ error: 'Username and password are required' });
 			return;
@@ -104,6 +135,38 @@ router.post('/login', async (req, res) => {
 		const refreshToken = signRefreshToken(user.id, user.username, user.role);
 		const legacyToken = signToken(user.id, user.username, user.mustChangePassword, user.role);
 		logAudit('login', user.id, `username=${username}`, req.ip);
+		res.json({
+			token: legacyToken,
+			accessToken,
+			refreshToken,
+			username: user.username,
+			role: user.role ?? 'admin',
+			mustChangePassword: user.mustChangePassword ?? false,
+		});
+	} catch {
+		res.status(500).json({ error: 'Login failed' });
+	}
+});
+
+// ── API Key 登入端點 ──────────────────────────────────────────
+
+router.post('/login-key', (req, res) => {
+	try {
+		const { apiKey } = req.body as { apiKey?: string };
+		if (!apiKey) {
+			res.status(400).json({ error: 'API key is required' });
+			return;
+		}
+		const user = verifyApiKey(apiKey);
+		if (!user) {
+			logAudit('login_failed', undefined, 'method=apikey', req.ip);
+			res.status(401).json({ error: 'Invalid API key' });
+			return;
+		}
+		const accessToken = signAccessToken(user.id, user.username, user.mustChangePassword, user.role);
+		const refreshToken = signRefreshToken(user.id, user.username, user.role);
+		const legacyToken = signToken(user.id, user.username, user.mustChangePassword, user.role);
+		logAudit('login_apikey', user.id, `username=${user.username}`, req.ip);
 		res.json({
 			token: legacyToken,
 			accessToken,
@@ -151,6 +214,34 @@ router.post('/change-password', requireAuth, async (req, res) => {
 	}
 });
 
+// ── API Key 查看與重新生成端點 ────────────────────────────────
+
+/** 取得當前使用者的 API Key */
+router.get('/api-key', requireAuth, (req, res) => {
+	try {
+		const user = getUserById(req.auth!.userId);
+		if (!user) {
+			res.status(404).json({ error: 'User not found' });
+			return;
+		}
+		res.json({ apiKey: user.apiKey });
+	} catch {
+		res.status(500).json({ error: 'Failed to get API key' });
+	}
+});
+
+/** 重新生成當前使用者的 API Key */
+router.post('/api-key/regenerate', requireAuth, (req, res) => {
+	try {
+		const newKey = regenerateApiKey(req.auth!.userId);
+		logAudit('apikey_regenerate', req.auth!.userId, `username=${req.auth!.username}`, req.ip);
+		res.json({ apiKey: newKey });
+	} catch (err) {
+		const message = err instanceof Error ? err.message : 'Failed to regenerate API key';
+		res.status(500).json({ error: message });
+	}
+});
+
 // ── 需要 Admin 角色的路由 ─────────────────────────────────────
 
 router.get('/users', requireAuth, requireAdmin, (_req, res) => {
@@ -166,8 +257,8 @@ router.put('/users/:id/role', requireAuth, requireAdmin, (req, res) => {
 	try {
 		const id = req.params.id as string;
 		const { role } = req.body as { role?: string };
-		if (role !== 'admin' && role !== 'viewer') {
-			res.status(400).json({ error: 'Role must be "admin" or "viewer"' });
+		if (role !== 'admin' && role !== 'member') {
+			res.status(400).json({ error: 'Role must be "admin" or "member"' });
 			return;
 		}
 		const target = getUserById(id);

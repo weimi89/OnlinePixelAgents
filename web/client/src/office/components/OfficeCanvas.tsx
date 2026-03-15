@@ -54,8 +54,9 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
   const rotateButtonBoundsRef = useRef<RotateButtonBounds | null>(null)
   // 右鍵擦除拖曳
   const isEraseDraggingRef = useRef(false)
-  // 迷你地圖邊界
+  // 迷你地圖邊界 + 顯示開關（預設隱藏，M 鍵切換）
   const minimapBoundsRef = useRef<MinimapBounds | null>(null)
+  const showMinimapRef = useRef(false)
   // 縮放滾動累加器，用於觸控板縮放靈敏度
   const zoomAccumulatorRef = useRef(0)
   // 觸控手勢
@@ -100,6 +101,20 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
     canvas.style.width = `${rect.width}px`
     canvas.style.height = `${rect.height}px`
     // 不使用 ctx.scale(dpr) — 我們直接以裝置像素渲染
+  }, [])
+
+  // M 鍵切換小地圖顯示
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'm' || e.key === 'M') {
+        // 避免在輸入框中觸發
+        const tag = (e.target as HTMLElement)?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+        showMinimapRef.current = !showMinimapRef.current
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
   }, [])
 
   useEffect(() => {
@@ -279,10 +294,10 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
         )
         offsetRef.current = { x: offsetX, y: offsetY }
 
-        // 迷你地圖（非編輯模式且非行動裝置時繪製）
+        // 迷你地圖（M 鍵切換顯示、非編輯模式、非行動裝置）
         const currentDpr = window.devicePixelRatio || 1
         const cssW = w / currentDpr
-        if (!isEditMode && cssW >= 768) {
+        if (showMinimapRef.current && !isEditMode && cssW >= 768) {
           minimapBoundsRef.current = renderMinimap(
             ctx, w, h,
             officeState.tileMap,

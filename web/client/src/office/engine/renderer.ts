@@ -962,11 +962,11 @@ export function renderMinimap(
   mmW = Math.round(mmW)
   mmH = Math.round(mmH)
 
-  // 小地圖定位：左下角、工具列上方
+  // 小地圖定位：左上角、縮放按鈕下方（縮放按鈕高度約 44px + 間距）
   const marginLeft = MINIMAP_MARGIN * dpr
-  const bottomOffset = (cssWidth < 768 ? 56 : 60) * dpr  // 工具列高度
+  const marginTop = 52 * dpr  // 縮放按鈕下方
   const mmX = marginLeft
-  const mmY = canvasHeight - mmH - bottomOffset
+  const mmY = marginTop
 
   // 背景
   const border = Math.max(1, Math.round(dpr))

@@ -14,8 +14,8 @@ interface ZoomControlsProps {
 }
 
 const btnBase: React.CSSProperties = {
-  width: 40,
-  height: 40,
+  width: 36,
+  height: 36,
   padding: 0,
   background: 'var(--pixel-bg)',
   color: 'var(--pixel-text)',
@@ -44,19 +44,16 @@ export const ZoomControls = memo(function ZoomControls({ zoom, onZoomChange }: Z
     if (zoom === prevZoomRef.current) return
     prevZoomRef.current = zoom
 
-    // 清除現有計時器
     if (timerRef.current) clearTimeout(timerRef.current)
     if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current)
 
     setShowLevel(true)
     setFadeOut(false)
 
-    // 延遲後開始淡出
     fadeTimerRef.current = setTimeout(() => {
       setFadeOut(true)
     }, ZOOM_LEVEL_FADE_DELAY_MS)
 
-    // 延遲後完全隱藏
     timerRef.current = setTimeout(() => {
       setShowLevel(false)
       setFadeOut(false)
@@ -96,7 +93,7 @@ export const ZoomControls = memo(function ZoomControls({ zoom, onZoomChange }: Z
         </div>
       )}
 
-      {/* 垂直排列的圓形按鈕 — 左上角 */}
+      {/* 水平排列 — 左上角 */}
       <div
         className="pixel-zoom-controls"
         style={{
@@ -105,28 +102,10 @@ export const ZoomControls = memo(function ZoomControls({ zoom, onZoomChange }: Z
           left: 8,
           zIndex: 'var(--pixel-controls-z)',
           display: 'flex',
-          flexDirection: 'column',
-          gap: 4,
+          flexDirection: 'row',
+          gap: 2,
         }}
       >
-        <button
-          onClick={() => onZoomChange(zoom + 1)}
-          disabled={maxDisabled}
-          onMouseEnter={() => setHovered('plus')}
-          onMouseLeave={() => setHovered(null)}
-          style={{
-            ...btnBase,
-            background: hovered === 'plus' && !maxDisabled ? 'var(--pixel-btn-hover-bg)' : btnBase.background,
-            cursor: maxDisabled ? 'default' : 'pointer',
-            opacity: maxDisabled ? 'var(--pixel-btn-disabled-opacity)' : 1,
-          }}
-          title={t.zoomIn}
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <line x1="9" y1="3" x2="9" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            <line x1="3" y1="9" x2="15" y2="9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-        </button>
         <button
           onClick={() => onZoomChange(zoom - 1)}
           disabled={minDisabled}
@@ -140,7 +119,25 @@ export const ZoomControls = memo(function ZoomControls({ zoom, onZoomChange }: Z
           }}
           title={t.zoomOut}
         >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+            <line x1="3" y1="9" x2="15" y2="9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
+        <button
+          onClick={() => onZoomChange(zoom + 1)}
+          disabled={maxDisabled}
+          onMouseEnter={() => setHovered('plus')}
+          onMouseLeave={() => setHovered(null)}
+          style={{
+            ...btnBase,
+            background: hovered === 'plus' && !maxDisabled ? 'var(--pixel-btn-hover-bg)' : btnBase.background,
+            cursor: maxDisabled ? 'default' : 'pointer',
+            opacity: maxDisabled ? 'var(--pixel-btn-disabled-opacity)' : 1,
+          }}
+          title={t.zoomIn}
+        >
+          <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+            <line x1="9" y1="3" x2="9" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             <line x1="3" y1="9" x2="15" y2="9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </button>

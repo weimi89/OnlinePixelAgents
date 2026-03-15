@@ -297,8 +297,10 @@ export const BottomToolbar = memo(function BottomToolbar({
 
   return (
     <div role="toolbar" aria-label={t.layout} className="pixel-bottom-toolbar" style={panelStyle}>
-      {tbBtn('building', t.building, t.buildingPanel, <IconBuilding />, onToggleBuildingView, isBuildingViewOpen)}
-      {tbBtn('dashboard', isDashboardView ? t.officeView : t.dashboard, t.dashboard, isDashboardView ? <IconOffice /> : <IconDashboard />, onToggleDashboardView, isDashboardView)}
+      {/* 大樓面板：所有人可見 */}
+      {isLoggedIn && tbBtn('building', t.building, t.buildingPanel, <IconBuilding />, onToggleBuildingView, isBuildingViewOpen)}
+      {/* 儀表板：僅登入用戶可見 */}
+      {isLoggedIn && tbBtn('dashboard', isDashboardView ? t.officeView : t.dashboard, t.dashboard, isDashboardView ? <IconOffice /> : <IconDashboard />, onToggleDashboardView, isDashboardView)}
       {/* 工作階段：僅 admin 可見 */}
       {isAdmin && tbBtn('sessions', t.sessions, t.browseSessions, <IconSessions />, onOpenSessionPicker, false)}
       {/* 行為參數：僅 admin 可見 */}
@@ -311,7 +313,8 @@ export const BottomToolbar = memo(function BottomToolbar({
       {isLoggedIn && tbBtn('share', t.shareLayout, t.shareLayout, <IconShare />, onToggleLayoutShare, isLayoutShareOpen)}
       {/* 佈局編輯：admin 總是可見，member 僅在自己樓層可見 */}
       {canEditLayout && tbBtn('edit', t.layout, t.editOfficeLayout, <IconEdit />, onToggleEditMode, isEditMode)}
-      <div style={{ position: 'relative' }}>
+      {/* 設定：僅登入用戶可見 */}
+      {isLoggedIn && <div style={{ position: 'relative' }}>
         {tbBtn('settings', t.settings, t.settings, <IconSettings />, onToggleSettings, isSettingsOpen)}
         <SettingsModal
           isOpen={isSettingsOpen}
@@ -329,8 +332,9 @@ export const BottomToolbar = memo(function BottomToolbar({
           theme={theme}
           onThemeToggle={onThemeToggle}
         />
-      </div>
-      {/* 錄製/回放控制 */}
+      </div>}
+      {/* 錄製/回放控制：僅登入用戶可見 */}
+      {isLoggedIn && (
       <div style={{ borderLeft: '1px solid var(--pixel-border)', paddingLeft: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
         {recorderState === 'idle' && (
           <>
@@ -390,6 +394,7 @@ export const BottomToolbar = memo(function BottomToolbar({
           </>
         )}
       </div>
+      )}
       {!isBuildingViewOpen && (
         <FloorSelector
           floors={floors}

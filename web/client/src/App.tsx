@@ -452,7 +452,7 @@ function App() {
         onPlay={handlePlayRecording}
       />
 
-      {!panels.isDashboardView && <ChatPanel messages={chatMessages} />}
+      {!panels.isDashboardView && auth.isAuthenticated && <ChatPanel messages={chatMessages} />}
 
       {!panels.isDashboardView && interaction.detailPanelAgentId != null && agents.includes(interaction.detailPanelAgentId) && (() => {
         // 組合代理資訊供面板使用（P3.4: 包含 ownerId）
